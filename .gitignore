@@ -1,0 +1,58 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Quarkus
+.quarkus/
+quarkus-app/
+
+# GraalVM native image
+*.so
+*.dylib
+*.dll
+*.exe
+*-runner
+*-runner.jar
+
+# IDE — IntelliJ
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# IDE — VSCode
+.vscode/
+*.code-workspace
+
+# IDE — Eclipse
+.project
+.classpath
+.settings/
+.factorypath
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment / secrets
+.env
+.env.*
+*.properties.local
+application-local.properties
+
+# Testcontainers reuse
+.testcontainers.properties
