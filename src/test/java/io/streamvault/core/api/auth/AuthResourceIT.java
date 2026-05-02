@@ -18,24 +18,24 @@ import static org.hamcrest.Matchers.*;
 @QuarkusTest
 class AuthResourceIT {
 
-    @Inject AgroalDataSource ds;
+    @Inject
+    AgroalDataSource ds;
 
     @BeforeEach
     void cleanup() throws SQLException {
         try (var conn = ds.getConnection();
-             var stmt = conn.createStatement()) {
+                var stmt = conn.createStatement()) {
             stmt.execute("TRUNCATE refresh_tokens, users");
         }
     }
 
-    // ── POST /auth/register ──────────────────────────────────────────────────
-
+    // ── POST /api/auth/register ──────────────────────────────────────────────────
     @Test
     void register_returnsCreated_withTokenPair() {
         given()
                 .contentType(ContentType.JSON)
                 .body(new RegisterRequest("admin", "Admin123!"))
-                .when().post("/auth/register")
+                .when().post("/api/auth/register")
                 .then()
                 .statusCode(201)
                 .body("accessToken", notNullValue())
@@ -49,7 +49,7 @@ class AuthResourceIT {
         given()
                 .contentType(ContentType.JSON)
                 .body(new RegisterRequest("admin2", "Admin456!"))
-                .when().post("/auth/register")
+                .when().post("/api/auth/register")
                 .then()
                 .statusCode(409)
                 .body("code", equalTo("ADMIN_EXISTS"));
@@ -60,7 +60,7 @@ class AuthResourceIT {
         given()
                 .contentType(ContentType.JSON)
                 .body(new RegisterRequest("", "Admin123!"))
-                .when().post("/auth/register")
+                .when().post("/api/auth/register")
                 .then()
                 .statusCode(400);
     }
@@ -70,12 +70,12 @@ class AuthResourceIT {
         given()
                 .contentType(ContentType.JSON)
                 .body(new RegisterRequest("admin", "alllowercase"))
-                .when().post("/auth/register")
+                .when().post("/api/auth/register")
                 .then()
                 .statusCode(400);
     }
 
-    // ── POST /auth/login ─────────────────────────────────────────────────────
+    // ── POST /api/auth/login ─────────────────────────────────────────────────────
 
     @Test
     void login_validCredentials_returnsOk() {
@@ -84,7 +84,7 @@ class AuthResourceIT {
         given()
                 .contentType(ContentType.JSON)
                 .body(new LoginRequest("admin", "Admin123!"))
-                .when().post("/auth/login")
+                .when().post("/api/auth/login")
                 .then()
                 .statusCode(200)
                 .body("accessToken", notNullValue())
@@ -98,7 +98,7 @@ class AuthResourceIT {
         given()
                 .contentType(ContentType.JSON)
                 .body(new LoginRequest("admin", "Wrong123!"))
-                .when().post("/auth/login")
+                .when().post("/api/auth/login")
                 .then()
                 .statusCode(401)
                 .body("code", equalTo("INVALID_CREDENTIALS"));
@@ -109,30 +109,30 @@ class AuthResourceIT {
         given()
                 .contentType(ContentType.JSON)
                 .body(new LoginRequest("", ""))
-                .when().post("/auth/login")
+                .when().post("/api/auth/login")
                 .then()
                 .statusCode(400);
     }
 
-    // ── POST /auth/refresh ───────────────────────────────────────────────────
+    // ── POST /api/auth/refresh ───────────────────────────────────────────────────
 
     @Test
     void refresh_unknownToken_returnsUnauthorized() {
         given()
                 .contentType(ContentType.JSON)
                 .body(new RefreshRequest("not-a-real-token"))
-                .when().post("/auth/refresh")
+                .when().post("/api/auth/refresh")
                 .then()
                 .statusCode(401)
                 .body("code", equalTo("TOKEN_NOT_FOUND"));
     }
 
-    // ── POST /auth/logout ────────────────────────────────────────────────────
+    // ── POST /api/auth/logout ────────────────────────────────────────────────────
 
     @Test
     void logout_noAuth_returnsUnauthorized() {
         given()
-                .when().post("/auth/logout")
+                .when().post("/api/auth/logout")
                 .then()
                 .statusCode(401);
     }
@@ -143,7 +143,7 @@ class AuthResourceIT {
 
         given()
                 .header("Authorization", "Bearer " + accessToken)
-                .when().post("/auth/logout")
+                .when().post("/api/auth/logout")
                 .then()
                 .statusCode(204);
     }
@@ -154,7 +154,7 @@ class AuthResourceIT {
         return given()
                 .contentType(ContentType.JSON)
                 .body(new RegisterRequest("admin", "Admin123!"))
-                .post("/auth/register")
+                .post("/api/auth/register")
                 .jsonPath()
                 .getString("accessToken");
     }
