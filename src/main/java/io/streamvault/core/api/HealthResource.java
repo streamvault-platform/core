@@ -1,23 +1,20 @@
 package io.streamvault.core.api;
 
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.MediaType;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.Router;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-@Path("/health")
+@ApplicationScoped
 public class HealthResource {
 
     @ConfigProperty(name = "streamvault.version", defaultValue = "dev")
     String version;
 
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    public HealthResponse get() {
-        return new HealthResponse("UP", version);
-    }
-
-    public record HealthResponse(String status, String version) {
+    void init(@Observes Router router) {
+        router.get("/health").handler(ctx -> ctx.response()
+                .putHeader("Content-Type", "application/json")
+                .end(JsonObject.of("status", "UP", "version", version).encode()));
     }
 }
