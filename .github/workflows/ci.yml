@@ -1,0 +1,152 @@
+name: CI / CD
+
+on:
+  pull_request:
+  push:
+    branches: [develop, release]
+    tags: ['v*']
+
+jobs:
+
+  # ── Compile & extract version (fail fast) ────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ steps.version.outputs.app_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Extract version from application.properties
+        id: version
+        run: |
+          APP_VERSION=$(grep '^streamvault.version=' \
+            src/main/resources/application.properties \
+            | cut -d= -f2 | sed 's/-SNAPSHOT//')
+          echo "app_version=${APP_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Compile & package
+        run: ./mvnw -B package -DskipTests -DskipITs
+
+  # ── Unit tests (*Test.java, no @QuarkusTest) ──────────────────────────────
+  test-unit:
+    name: Unit tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run unit tests
+        run: ./mvnw -B test
+
+  # ── Integration tests (*IT.java, @QuarkusTest + Testcontainers) ───────────
+  test-it:
+    name: Integration tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run integration tests
+        run: ./mvnw -B verify -DskipITs=false
+
+  # ── Build & push Docker image to GHCR ────────────────────────────────────
+  docker:
+    name: Build & push image
+    needs: [build, test-unit, test-it]
+    if: >
+      github.ref == 'refs/heads/develop' ||
+      github.ref == 'refs/heads/release' ||
+      github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image tag
+        id: tag
+        run: |
+          VERSION="${{ needs.build.outputs.app_version }}"
+          if [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "image_tag=${VERSION}-dev" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/release" ]]; then
+            echo "image_tag=${VERSION}-rc.${{ github.run_number }}" >> $GITHUB_OUTPUT
+          else
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            if [ "${TAG_VERSION}" != "${VERSION}" ]; then
+              echo "Tag (${TAG_VERSION}) does not match application.properties version (${VERSION})" >&2
+              exit 1
+            fi
+            echo "image_tag=${VERSION}" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build JAR
+        run: ./mvnw -B package -DskipTests -DskipITs
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/main/docker/Dockerfile.jvm
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/core:${{ steps.tag.outputs.image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Notify infra repo so it can update image references ──────────────────
+  # Requires a PAT (repo + workflow scope) stored as INFRA_DISPATCH_TOKEN.
+  # The infra workflow listens for event-type: core-image-published.
+  notify-infra:
+    name: Notify infra
+    needs: [docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+          repository: streamvault-app/streamvault-infra
+          event-type: core-image-published
+          client-payload: >
+            {
+              "image": "ghcr.io/${{ github.repository_owner }}/core:${{ needs.docker.outputs.image_tag }}",
+              "tag": "${{ needs.docker.outputs.image_tag }}",
+              "ref": "${{ github.ref }}"
+            }
