@@ -3,8 +3,8 @@ name: CI / CD
 on:
   pull_request:
   push:
-    branches: [develop, release]
-    tags: ['v*']
+    branches: [ develop, release ]
+    tags: [ "v*" ]
 
 jobs:
 
@@ -15,13 +15,13 @@ jobs:
     outputs:
       app_version: ${{ steps.version.outputs.app_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
+          java-version: "21"
+          distribution: "temurin"
+          cache: "maven"
 
       - name: Extract version from application.properties
         id: version
@@ -40,13 +40,13 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
+          java-version: "21"
+          distribution: "temurin"
+          cache: "maven"
 
       - name: Run unit tests
         run: ./mvnw -B test
@@ -57,13 +57,13 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
+          java-version: "21"
+          distribution: "temurin"
+          cache: "maven"
 
       - name: Run integration tests
         run: ./mvnw -B verify -DskipITs=false
@@ -71,11 +71,10 @@ jobs:
   # ── Build & push Docker image to GHCR ────────────────────────────────────
   docker:
     name: Build & push image
-    needs: [build, test-unit, test-it]
+    needs: [ build, test-unit, test-it ]
     if: >
-      github.ref == 'refs/heads/develop' ||
-      github.ref == 'refs/heads/release' ||
-      github.ref_type == 'tag'
+      github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/release'
+      || github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -83,7 +82,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.tag.outputs.image_tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Compute image tag
         id: tag
@@ -104,9 +103,9 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
+          java-version: "21"
+          distribution: "temurin"
+          cache: "maven"
 
       - name: Build JAR
         run: ./mvnw -B package -DskipTests -DskipITs
@@ -127,7 +126,8 @@ jobs:
           context: .
           file: src/main/docker/Dockerfile.jvm
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/core:${{ steps.tag.outputs.image_tag }}
+          tags: ghcr.io/${{ github.repository_owner }}/core:${{
+            steps.tag.outputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -136,7 +136,7 @@ jobs:
   # The infra workflow listens for event-type: core-image-published.
   notify-infra:
     name: Notify infra
-    needs: [docker]
+    needs: [ docker ]
     runs-on: ubuntu-latest
     steps:
       - uses: peter-evans/repository-dispatch@v3
