@@ -66,12 +66,19 @@ All Subsonic endpoints return XML by default, JSON if f=json param present.
 - OAuth2 / social login — post-MVP
 
 ### Library
-- Configure one or more media folders via API/config
-- Scan folders recursively for audio files (MP3, FLAC, AAC, OGG)
-- Read ID3/metadata tags on scan (title, artist, album, year, genre, artwork)
-- Persist library to Postgres
-- Manual rescan trigger via API
-- Auto-rescan on file change (inotify) — post-MVP
+- Admin uploads audio files via multipart POST /api/admin/upload (single or bulk)
+- Supported formats: MP3, FLAC, OGG, AAC/M4A
+- ID3/metadata extracted at upload time with JAudioTagger; falls back to filename
+- Shared catalog: tracks, artists, albums — all authenticated users can browse
+- Personal library: each user adds/removes tracks from the shared catalog
+  - POST /api/library/my — add track to personal library
+  - DELETE /api/library/my/{trackId} — remove track
+  - GET /api/library/my — list personal library
+- Storage backend is configurable via STREAMVAULT_STORAGE_BACKEND env var (default: filesystem)
+  - filesystem: files stored at STREAMVAULT_MEDIA_PATH (default /var/streamvault/media)
+  - s3: stub only — not yet implemented
+  - Interface: application/storage/StorageBackend.java (port)
+  - Implementations: infra/storage/ (adapters selected by StorageBackendProducer)
 - Video library — post-MVP (music first)
 
 ### Streaming
