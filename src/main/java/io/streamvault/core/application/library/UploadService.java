@@ -3,9 +3,9 @@ package io.streamvault.core.application.library;
 import io.quarkus.hibernate.reactive.panache.Panache;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
-import io.smallrye.mutiny.infrastructure.Infrastructure;
 import io.streamvault.core.application.storage.StorageBackend;
 import io.streamvault.core.domain.library.*;
+import io.vertx.mutiny.core.Vertx;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jaudiotagger.audio.AudioFileIO;
@@ -26,13 +26,18 @@ public class UploadService {
     private static final Logger LOG = Logger.getLogger(UploadService.class);
 
     private static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
-            ".mp3", ".flac", ".ogg", ".aac", ".m4a"
-    );
+            ".mp3", ".flac", ".ogg", ".aac", ".m4a");
 
-    @Inject StorageBackend storage;
-    @Inject ArtistRepository artists;
-    @Inject AlbumRepository albums;
-    @Inject TrackRepository tracks;
+    @Inject
+    Vertx vertx;
+    @Inject
+    StorageBackend storage;
+    @Inject
+    ArtistRepository artists;
+    @Inject
+    AlbumRepository albums;
+    @Inject
+    TrackRepository tracks;
 
     public Uni<List<Track>> processUploads(List<FileUpload> uploads) {
         return Multi.createFrom().iterable(uploads)
@@ -49,9 +54,7 @@ public class UploadService {
                     new LibraryException(new LibraryError.UnsupportedFileType(filename)));
         }
 
-        return Uni.createFrom()
-                .item(() -> storeAndExtract(upload, ext))
-                .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
+        return vertx.executeBlocking(() -> storeAndExtract(upload, ext))
                 .flatMap(metadata -> Panache.withTransaction(() -> upsertTrack(metadata)));
     }
 
@@ -95,13 +98,15 @@ public class UploadService {
     private Uni<Track> upsertTrack(TrackMetadata meta) {
         return resolveArtist(meta.artist())
                 .flatMap(artist -> resolveAlbum(meta.album(), artist)
-                .flatMap(album -> upsertTrackEntity(meta, artist, album)));
+                        .flatMap(album -> upsertTrackEntity(meta, artist, album)));
     }
 
     private Uni<Artist> resolveArtist(String name) {
-        if (name == null) return Uni.createFrom().nullItem();
+        if (name == null)
+            return Uni.createFrom().nullItem();
         return artists.findByName(name).flatMap(opt -> {
-            if (opt.isPresent()) return Uni.createFrom().item(opt.get());
+            if (opt.isPresent())
+                return Uni.createFrom().item(opt.get());
             var a = new Artist();
             a.name = name;
             return artists.persist(a);
@@ -109,9 +114,11 @@ public class UploadService {
     }
 
     private Uni<Album> resolveAlbum(String title, Artist artist) {
-        if (title == null || artist == null) return Uni.createFrom().nullItem();
+        if (title == null || artist == null)
+            return Uni.createFrom().nullItem();
         return albums.findByTitleAndArtist(title, artist.id).flatMap(opt -> {
-            if (opt.isPresent()) return Uni.createFrom().item(opt.get());
+            if (opt.isPresent())
+                return Uni.createFrom().item(opt.get());
             var a = new Album();
             a.title = title;
             a.artist = artist;
@@ -150,10 +157,14 @@ public class UploadService {
 
     private String mimeTypeFor(Path path) {
         String name = path.getFileName().toString().toLowerCase();
-        if (name.endsWith(".mp3"))  return "audio/mpeg";
-        if (name.endsWith(".flac")) return "audio/flac";
-        if (name.endsWith(".ogg"))  return "audio/ogg";
-        if (name.endsWith(".aac") || name.endsWith(".m4a")) return "audio/aac";
+        if (name.endsWith(".mp3"))
+            return "audio/mpeg";
+        if (name.endsWith(".flac"))
+            return "audio/flac";
+        if (name.endsWith(".ogg"))
+            return "audio/ogg";
+        if (name.endsWith(".aac") || name.endsWith(".m4a"))
+            return "audio/aac";
         return "application/octet-stream";
     }
 
@@ -162,7 +173,8 @@ public class UploadService {
     }
 
     private Integer parseIntOrNull(String s) {
-        if (s == null || s.isBlank()) return null;
+        if (s == null || s.isBlank())
+            return null;
         try {
             String cleaned = s.contains("/") ? s.substring(0, s.indexOf('/')) : s;
             return Integer.parseInt(cleaned.trim());

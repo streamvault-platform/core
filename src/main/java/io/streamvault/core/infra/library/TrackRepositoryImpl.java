@@ -15,7 +15,7 @@ public class TrackRepositoryImpl implements TrackRepository, PanacheRepositoryBa
 
     @Override
     public Uni<Optional<Track>> findTrackById(UUID id) {
-        return PanacheRepositoryBase.super.findById(id).map(Optional::ofNullable);
+        return find("id", id).firstResult().map(Optional::ofNullable);
     }
 
     @Override
