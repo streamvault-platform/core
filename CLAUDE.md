@@ -15,7 +15,9 @@ Java 21 · Quarkus 3.x · PostgreSQL 16 · Kafka (optional) · REST + WebSocket
 - Config: application.properties + ENV overrides. 12-factor. Never hardcode values.
 - Kafka: quarkus-messaging-kafka, only active when kafka.enabled=true in config.
   Fallback: in-process queue (java.util.concurrent.LinkedBlockingQueue) when disabled.
-- OpenAPI: spec-first. openapi.yaml is the contract. JAX-RS annotations must match it.
+- OpenAPI: code-first via quarkus-smallrye-openapi. Spec auto-generated from JAX-RS
+  annotations and served at GET /q/openapi. Enrich with @Operation/@APIResponse/@Tag
+  annotations where the generated output is unclear. Never hand-write openapi.yaml.
 - Reactive model: all DB operations return Uni<T> or Multi<T> (Mutiny). Use @ReactiveTransactional for writes.
 - Blocking I/O (file streaming): annotate those endpoints with @Blocking. Never block the event loop elsewhere.
 
@@ -47,6 +49,13 @@ All Subsonic endpoints return XML by default, JSON if f=json param present.
 - media.transcoded     (mark media as playback-ready)
 - media.metadata-ready (update library metadata)
 - watch.sync-ready     (notify watch client via WebSocket)
+
+## Test patterns
+- Always use `TRUNCATE ... CASCADE` in `@BeforeEach` cleanup — `user_library_tracks` and
+  `refresh_tokens` both have FKs on `users`, plain TRUNCATE will fail with a Postgres FK error.
+- Never call `PanacheRepositoryBase.super.<method>()` — Panache replaces those via bytecode
+  generation at build time; the interface default is a dead stub that throws. Use the Panache
+  query API (`find`, `delete`, etc.) directly instead.
 
 ## Do NOT
 - Add Spring annotations (@Component, @Service, @Autowired etc.)

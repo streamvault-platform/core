@@ -15,6 +15,11 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 
 import java.util.List;
@@ -22,6 +27,7 @@ import java.util.List;
 @Path("/admin/upload")
 @RolesAllowed("ADMIN")
 @Produces(MediaType.APPLICATION_JSON)
+@Tag(name = "Admin — Upload", description = "Admin-only endpoints for ingesting audio files into the library")
 public class AdminUploadResource {
 
     @Inject
@@ -29,6 +35,13 @@ public class AdminUploadResource {
 
     @POST
     @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Operation(summary = "Upload audio files", description = "Upload one or more audio files (MP3, FLAC, OGG, AAC/M4A). Metadata is extracted automatically from ID3 tags.")
+    @APIResponse(responseCode = "201", description = "All files ingested successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = UploadResponse.class)))
+    @APIResponse(responseCode = "400", description = "No files provided")
+    @APIResponse(responseCode = "401", description = "Missing or invalid JWT")
+    @APIResponse(responseCode = "403", description = "Caller is not an ADMIN")
+    @APIResponse(responseCode = "422", description = "One or more files have an unsupported format")
     public Uni<Response> upload(UploadForm form) {
         if (form.files == null || form.files.isEmpty()) {
             return Uni.createFrom().item(
