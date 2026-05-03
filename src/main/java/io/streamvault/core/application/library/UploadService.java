@@ -41,7 +41,7 @@ public class UploadService {
 
     public Uni<List<Track>> processUploads(List<FileUpload> uploads) {
         return Multi.createFrom().iterable(uploads)
-                .flatMap(upload -> processOne(upload).toMulti())
+                .onItem().transformToUniAndConcatenate(this::processOne)
                 .collect().asList();
     }
 
