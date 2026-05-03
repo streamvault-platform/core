@@ -25,7 +25,7 @@ class AuthResourceIT {
     void cleanup() throws SQLException {
         try (var conn = ds.getConnection();
                 var stmt = conn.createStatement()) {
-            stmt.execute("TRUNCATE refresh_tokens, users");
+            stmt.execute("TRUNCATE refresh_tokens, users CASCADE");
         }
     }
 

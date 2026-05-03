@@ -15,7 +15,9 @@ Java 21 · Quarkus 3.x · PostgreSQL 16 · Kafka (optional) · REST + WebSocket
 - Config: application.properties + ENV overrides. 12-factor. Never hardcode values.
 - Kafka: quarkus-messaging-kafka, only active when kafka.enabled=true in config.
   Fallback: in-process queue (java.util.concurrent.LinkedBlockingQueue) when disabled.
-- OpenAPI: spec-first. openapi.yaml is the contract. JAX-RS annotations must match it.
+- OpenAPI: code-first via quarkus-smallrye-openapi. Spec auto-generated from JAX-RS
+  annotations and served at GET /q/openapi. Enrich with @Operation/@APIResponse/@Tag
+  annotations where the generated output is unclear. Never hand-write openapi.yaml.
 - Reactive model: all DB operations return Uni<T> or Multi<T> (Mutiny). Use @ReactiveTransactional for writes.
 - Blocking I/O (file streaming): annotate those endpoints with @Blocking. Never block the event loop elsewhere.
 
@@ -48,6 +50,13 @@ All Subsonic endpoints return XML by default, JSON if f=json param present.
 - media.metadata-ready (update library metadata)
 - watch.sync-ready     (notify watch client via WebSocket)
 
+## Test patterns
+- Always use `TRUNCATE ... CASCADE` in `@BeforeEach` cleanup — `user_library_tracks` and
+  `refresh_tokens` both have FKs on `users`, plain TRUNCATE will fail with a Postgres FK error.
+- Never call `PanacheRepositoryBase.super.<method>()` — Panache replaces those via bytecode
+  generation at build time; the interface default is a dead stub that throws. Use the Panache
+  query API (`find`, `delete`, etc.) directly instead.
+
 ## Do NOT
 - Add Spring annotations (@Component, @Service, @Autowired etc.)
 - Write business logic in resource (controller) classes
@@ -66,12 +75,19 @@ All Subsonic endpoints return XML by default, JSON if f=json param present.
 - OAuth2 / social login — post-MVP
 
 ### Library
-- Configure one or more media folders via API/config
-- Scan folders recursively for audio files (MP3, FLAC, AAC, OGG)
-- Read ID3/metadata tags on scan (title, artist, album, year, genre, artwork)
-- Persist library to Postgres
-- Manual rescan trigger via API
-- Auto-rescan on file change (inotify) — post-MVP
+- Admin uploads audio files via multipart POST /api/admin/upload (single or bulk)
+- Supported formats: MP3, FLAC, OGG, AAC/M4A
+- ID3/metadata extracted at upload time with JAudioTagger; falls back to filename
+- Shared catalog: tracks, artists, albums — all authenticated users can browse
+- Personal library: each user adds/removes tracks from the shared catalog
+  - POST /api/library/my — add track to personal library
+  - DELETE /api/library/my/{trackId} — remove track
+  - GET /api/library/my — list personal library
+- Storage backend is configurable via STREAMVAULT_STORAGE_BACKEND env var (default: filesystem)
+  - filesystem: files stored at STREAMVAULT_MEDIA_PATH (default /var/streamvault/media)
+  - s3: stub only — not yet implemented
+  - Interface: application/storage/StorageBackend.java (port)
+  - Implementations: infra/storage/ (adapters selected by StorageBackendProducer)
 - Video library — post-MVP (music first)
 
 ### Streaming

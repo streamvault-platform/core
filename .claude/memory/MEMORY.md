@@ -1,0 +1,2 @@
+- [Test cleanup requires TRUNCATE CASCADE](feedback_truncate_cascade.md) — always use CASCADE; user_library_tracks + refresh_tokens both reference users
+- [Always annotate new endpoints with MicroProfile OpenAPI annotations](feedback_openapi_annotations.md) — @Tag on class, @Operation + @APIResponse on every method; HealthResource (Vert.x router) is exempt
