@@ -112,3 +112,25 @@ All Subsonic endpoints return XML by default, JSON if f=json param present.
 - /health liveness + readiness endpoints
 - /metrics Prometheus endpoint (via Quarkus Micrometer)
 - Structured JSON logs
+
+---
+
+## Deferred / Future Work
+
+Things explicitly decided to defer — not forgotten, not in scope for MVP.
+
+### Streaming
+- **S3 storage backend** — `S3StorageBackend` is stubbed. Implement with AWS SDK v2. Add `presignUrl(storedPath, expiresIn)` to `StorageBackend` interface for client-direct streaming (bypasses server, critical for high traffic).
+- **On-the-fly transcoding** — serve originals first, transcode post-MVP via FFmpeg.
+
+### Playback state
+- **Heartbeat position updates** — clients will send periodic position events (~every 15s). Do NOT write each one to Postgres. Buffer in Redis (already in stack), flush to Postgres on PAUSE or via a 30s background job.
+- **Multi-device sync** — broadcast playback events to other connected sessions of the same user.
+
+### Library / Clients
+- **Subsonic 1.16.1 API** (`/rest/`) — deferred intentionally. Useful for migration tooling or compatibility with existing clients (Symfonium, Ultrasonic) if ever needed. Not a priority while building own app.
+- **Spotify / Subsonic import** — migration tooling for users moving from other platforms. Post-launch feature.
+
+### Auth
+- **Multi-user with roles** — single user (admin) is fine for v1.
+- **OAuth2 / social login** — post-MVP.
