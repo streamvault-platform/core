@@ -1,5 +1,7 @@
 package io.streamvault.core.application.storage;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Path;
 
 /**
@@ -18,4 +20,19 @@ public interface StorageBackend {
      *         filesystem, object key for S3)
      */
     String store(Path tempFile, String originalFilename, String extension);
+
+    /**
+     * Returns size and last-modified timestamp for the stored file.
+     * Throws {@link java.io.FileNotFoundException} if the path does not exist.
+     */
+    StoredFileMetadata metadata(String storedPath) throws IOException;
+
+    /** Opens a stream over the entire file. */
+    InputStream openFull(String storedPath) throws IOException;
+
+    /**
+     * Opens a stream limited to {@code length} bytes starting at {@code offset}.
+     * S3 implementations should map this to a native byte-range GET request.
+     */
+    InputStream openRange(String storedPath, long offset, long length) throws IOException;
 }

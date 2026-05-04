@@ -1,8 +1,11 @@
 package io.streamvault.core.infra.storage;
 
 import io.streamvault.core.application.storage.StorageBackend;
+import io.streamvault.core.application.storage.StoredFileMetadata;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Path;
 
 @ApplicationScoped
@@ -17,6 +20,27 @@ public class S3StorageBackend implements StorageBackend {
 
     @Override
     public String store(Path tempFile, String originalFilename, String extension) {
+        throw new UnsupportedOperationException(
+                "S3 storage backend is not yet implemented. " +
+                "Set streamvault.storage.backend=filesystem to use local storage.");
+    }
+
+    @Override
+    public StoredFileMetadata metadata(String storedPath) throws IOException {
+        throw new UnsupportedOperationException(
+                "S3 storage backend is not yet implemented. " +
+                "Set streamvault.storage.backend=filesystem to use local storage.");
+    }
+
+    @Override
+    public InputStream openFull(String storedPath) throws IOException {
+        throw new UnsupportedOperationException(
+                "S3 storage backend is not yet implemented. " +
+                "Set streamvault.storage.backend=filesystem to use local storage.");
+    }
+
+    @Override
+    public InputStream openRange(String storedPath, long offset, long length) throws IOException {
         throw new UnsupportedOperationException(
                 "S3 storage backend is not yet implemented. " +
                 "Set streamvault.storage.backend=filesystem to use local storage.");

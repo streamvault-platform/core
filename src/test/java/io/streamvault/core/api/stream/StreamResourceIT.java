@@ -17,6 +17,7 @@ import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
+import static org.hamcrest.text.IsEmptyString.emptyOrNullString;
 
 @QuarkusTest
 class StreamResourceIT {
@@ -161,6 +162,81 @@ class StreamResourceIT {
                 .then()
                 .statusCode(416)
                 .header("Content-Range", equalTo("bytes */100"));
+    }
+
+    // ── HEAD ─────────────────────────────────────────────────────────────────
+
+    @Test
+    void head_returnsHeadersWithoutBody() throws IOException {
+        String trackId = uploadTrack("track.mp3", 100);
+        given()
+                .header("Authorization", "Bearer " + adminToken)
+                .when().head("/api/stream/" + trackId)
+                .then()
+                .statusCode(200)
+                .header("Content-Length", equalTo("100"))
+                .header("Accept-Ranges", equalTo("bytes"))
+                .header("ETag", notNullValue())
+                .header("Content-Disposition", containsString("inline"))
+                .body(emptyOrNullString());
+    }
+
+    // ── ETag ─────────────────────────────────────────────────────────────────
+
+    @Test
+    void stream_fullFile_includesEtag() throws IOException {
+        String trackId = uploadTrack("track.mp3", 100);
+        given()
+                .header("Authorization", "Bearer " + adminToken)
+                .when().get("/api/stream/" + trackId)
+                .then()
+                .statusCode(200)
+                .header("ETag", matchesPattern("\"[^\"]+\""));
+    }
+
+    @Test
+    void stream_rangeWithMatchingIfRange_serves206() throws IOException {
+        String trackId = uploadTrack("track.mp3", 100);
+        String etag = given()
+                .header("Authorization", "Bearer " + adminToken)
+                .when().get("/api/stream/" + trackId)
+                .then().extract().header("ETag");
+
+        given()
+                .header("Authorization", "Bearer " + adminToken)
+                .header("Range", "bytes=0-9")
+                .header("If-Range", etag)
+                .when().get("/api/stream/" + trackId)
+                .then()
+                .statusCode(206)
+                .header("Content-Length", equalTo("10"));
+    }
+
+    @Test
+    void stream_rangeWithStaleIfRange_servesFullFile() throws IOException {
+        String trackId = uploadTrack("track.mp3", 100);
+        given()
+                .header("Authorization", "Bearer " + adminToken)
+                .header("Range", "bytes=0-9")
+                .header("If-Range", "\"stale-etag\"")
+                .when().get("/api/stream/" + trackId)
+                .then()
+                .statusCode(200)
+                .header("Content-Length", equalTo("100"));
+    }
+
+    // ── Content-Disposition ──────────────────────────────────────────────────
+
+    @Test
+    void stream_fullFile_includesFilenameInDisposition() throws IOException {
+        String trackId = uploadTrack("track.mp3", 100);
+        given()
+                .header("Authorization", "Bearer " + adminToken)
+                .when().get("/api/stream/" + trackId)
+                .then()
+                .statusCode(200)
+                .header("Content-Disposition", startsWith("inline; filename=\""))
+                .header("Content-Disposition", containsString(".mp3\""));
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

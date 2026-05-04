@@ -4,10 +4,11 @@ import java.io.InputStream;
 
 public sealed interface StreamResponse {
 
-    record FullFile(InputStream content, String mimeType, long fileSize) implements StreamResponse {}
+    record FullFile(InputStream content, String mimeType, long fileSize, String etag, String filename)
+            implements StreamResponse {}
 
-    record PartialFile(InputStream content, String mimeType, long fileSize, long start, long end)
-            implements StreamResponse {
+    record PartialFile(InputStream content, String mimeType, long fileSize, long start, long end,
+                       String etag, String filename) implements StreamResponse {
         public long length() { return end - start + 1; }
     }
 

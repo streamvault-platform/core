@@ -2,13 +2,19 @@ package io.streamvault.core.infra.storage;
 
 import io.streamvault.core.application.library.LibraryException;
 import io.streamvault.core.application.storage.StorageBackend;
+import io.streamvault.core.application.storage.StoredFileMetadata;
 import io.streamvault.core.domain.library.LibraryError;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -28,5 +34,28 @@ public class FilesystemStorageBackend implements StorageBackend {
         } catch (IOException e) {
             throw new LibraryException(new LibraryError.StorageError(e.getMessage()));
         }
+    }
+
+    @Override
+    public StoredFileMetadata metadata(String storedPath) throws IOException {
+        Path file = Path.of(storedPath);
+        if (!Files.exists(file)) {
+            throw new FileNotFoundException("File not found: " + storedPath);
+        }
+        return new StoredFileMetadata(
+                Files.size(file),
+                Files.getLastModifiedTime(file).toInstant());
+    }
+
+    @Override
+    public InputStream openFull(String storedPath) throws IOException {
+        return Files.newInputStream(Path.of(storedPath));
+    }
+
+    @Override
+    public InputStream openRange(String storedPath, long offset, long length) throws IOException {
+        FileChannel channel = FileChannel.open(Path.of(storedPath), StandardOpenOption.READ);
+        channel.position(offset);
+        return new LimitedInputStream(Channels.newInputStream(channel), length);
     }
 }

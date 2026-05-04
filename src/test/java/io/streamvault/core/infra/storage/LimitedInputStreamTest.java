@@ -1,4 +1,4 @@
-package io.streamvault.core.application.stream;
+package io.streamvault.core.infra.storage;
 
 import org.junit.jupiter.api.Test;
 

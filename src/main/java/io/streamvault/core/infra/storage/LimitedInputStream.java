@@ -1,4 +1,4 @@
-package io.streamvault.core.application.stream;
+package io.streamvault.core.infra.storage;
 
 import java.io.IOException;
 import java.io.InputStream;

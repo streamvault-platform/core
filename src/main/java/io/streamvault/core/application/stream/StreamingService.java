@@ -3,17 +3,17 @@ package io.streamvault.core.application.stream;
 import io.quarkus.hibernate.reactive.panache.Panache;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
+import io.streamvault.core.application.storage.StorageBackend;
+import io.streamvault.core.application.storage.StoredFileMetadata;
+import io.streamvault.core.domain.library.Track;
 import io.streamvault.core.domain.library.TrackRepository;
 import io.streamvault.core.domain.stream.StreamError;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -22,31 +22,62 @@ public class StreamingService {
     @Inject
     TrackRepository tracks;
 
-    public Uni<StreamResponse> serve(UUID trackId, String rangeHeader) {
-        return Panache.withTransaction(() -> tracks.findTrackById(trackId))
+    @Inject
+    StorageBackend storageBackend;
+
+    public Uni<StreamResponse> serve(UUID trackId, String rangeHeader, String ifRangeHeader) {
+        return Panache.withTransaction(() -> tracks.findTrackByIdWithDetails(trackId))
                 .map(opt -> opt.orElseThrow(() -> new StreamException(new StreamError.TrackNotFound())))
+                .map(StreamingService::toTrackInfo)
                 .emitOn(Infrastructure.getDefaultWorkerPool())
-                .map(track -> openFile(track.filePath, track.mimeType, track.fileSize, rangeHeader));
+                .map(info -> openFile(info, rangeHeader, ifRangeHeader));
     }
 
-    private StreamResponse openFile(String filePath, String mimeType, Long storedSize, String rangeHeader) {
-        java.nio.file.Path file = java.nio.file.Path.of(filePath);
+    public Uni<FileMetadata> probe(UUID trackId) {
+        return Panache.withTransaction(() -> tracks.findTrackByIdWithDetails(trackId))
+                .map(opt -> opt.orElseThrow(() -> new StreamException(new StreamError.TrackNotFound())))
+                .map(StreamingService::toTrackInfo)
+                .emitOn(Infrastructure.getDefaultWorkerPool())
+                .map(this::buildMetadata);
+    }
 
-        if (!Files.exists(file)) {
-            throw new StreamException(new StreamError.FileNotFound(filePath));
+    // ── private helpers ───────────────────────────────────────────────────────
+
+    private record TrackInfo(String filePath, String mimeType, String title, String artistName) {}
+
+    private static TrackInfo toTrackInfo(Track track) {
+        return new TrackInfo(
+                track.filePath,
+                track.mimeType,
+                track.title,
+                track.artist != null ? track.artist.name : null);
+    }
+
+    private FileMetadata buildMetadata(TrackInfo info) {
+        StoredFileMetadata meta = loadMetadata(info.filePath());
+        return new FileMetadata(
+                info.mimeType() != null ? info.mimeType() : "application/octet-stream",
+                meta.size(),
+                computeEtag(meta),
+                buildFilename(info.title(), info.artistName(), info.mimeType()));
+    }
+
+    private StreamResponse openFile(TrackInfo info, String rangeHeader, String ifRangeHeader) {
+        StoredFileMetadata meta = loadMetadata(info.filePath());
+        String mime = info.mimeType() != null ? info.mimeType() : "application/octet-stream";
+        long fileSize = meta.size();
+        String etag = computeEtag(meta);
+        String filename = buildFilename(info.title(), info.artistName(), info.mimeType());
+
+        boolean serveRange = rangeHeader != null && !rangeHeader.isBlank();
+        if (serveRange && ifRangeHeader != null && !ifRangeHeader.isBlank()) {
+            serveRange = ifRangeHeader.equals(etag);
         }
 
-        String mime = mimeType != null ? mimeType : "application/octet-stream";
-        long fileSize;
-        try {
-            fileSize = (storedSize != null && storedSize > 0) ? storedSize : Files.size(file);
-        } catch (IOException e) {
-            throw new StreamException(new StreamError.ReadError(e.getMessage()));
-        }
-
-        if (rangeHeader == null || rangeHeader.isBlank()) {
+        if (!serveRange) {
             try {
-                return new StreamResponse.FullFile(Files.newInputStream(file), mime, fileSize);
+                InputStream content = storageBackend.openFull(info.filePath());
+                return new StreamResponse.FullFile(content, mime, fileSize, etag, filename);
             } catch (IOException e) {
                 throw new StreamException(new StreamError.ReadError(e.getMessage()));
             }
@@ -58,16 +89,49 @@ public class StreamingService {
         }
 
         try {
-            InputStream partial = openRange(file, range.start(), range.length());
-            return new StreamResponse.PartialFile(partial, mime, fileSize, range.start(), range.end());
+            InputStream partial = storageBackend.openRange(info.filePath(), range.start(), range.length());
+            return new StreamResponse.PartialFile(partial, mime, fileSize, range.start(), range.end(), etag, filename);
         } catch (IOException e) {
             throw new StreamException(new StreamError.ReadError(e.getMessage()));
         }
     }
 
-    private InputStream openRange(java.nio.file.Path file, long start, long length) throws IOException {
-        FileChannel channel = FileChannel.open(file, StandardOpenOption.READ);
-        channel.position(start);
-        return new LimitedInputStream(Channels.newInputStream(channel), length);
+    private StoredFileMetadata loadMetadata(String filePath) {
+        try {
+            return storageBackend.metadata(filePath);
+        } catch (FileNotFoundException e) {
+            throw new StreamException(new StreamError.FileNotFound(filePath));
+        } catch (IOException e) {
+            throw new StreamException(new StreamError.ReadError(e.getMessage()));
+        }
+    }
+
+    private static String computeEtag(StoredFileMetadata meta) {
+        return "\"" + meta.size() + "-" + meta.lastModified().toEpochMilli() + "\"";
+    }
+
+    static String buildFilename(String title, String artistName, String mimeType) {
+        String ext = extensionFor(mimeType);
+        String base;
+        if (artistName != null && !artistName.isBlank() && title != null && !title.isBlank()) {
+            base = artistName.trim() + " - " + title.trim();
+        } else if (title != null && !title.isBlank()) {
+            base = title.trim();
+        } else {
+            base = "track";
+        }
+        base = base.replaceAll("[\"\\\\]", "_");
+        return base + ext;
+    }
+
+    private static String extensionFor(String mimeType) {
+        if (mimeType == null) return "";
+        return switch (mimeType) {
+            case "audio/mpeg" -> ".mp3";
+            case "audio/flac" -> ".flac";
+            case "audio/ogg" -> ".ogg";
+            case "audio/aac", "audio/mp4", "audio/x-m4a" -> ".m4a";
+            default -> "";
+        };
     }
 }
