@@ -19,6 +19,12 @@ public class TrackRepositoryImpl implements TrackRepository, PanacheRepositoryBa
     }
 
     @Override
+    public Uni<Optional<Track>> findTrackByIdWithDetails(UUID id) {
+        return find("SELECT t FROM Track t LEFT JOIN FETCH t.artist LEFT JOIN FETCH t.album WHERE t.id = ?1", id)
+                .firstResult().map(Optional::ofNullable);
+    }
+
+    @Override
     public Uni<Optional<Track>> findByFilePath(String filePath) {
         return find("filePath", filePath).firstResult().map(Optional::ofNullable);
     }
