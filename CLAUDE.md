@@ -3,7 +3,7 @@
 ## Project
 Core API service for Streamvault — self-hostable music/video streaming platform.
 Handles: media library, user auth, streaming, WebSockets, Subsonic-compatible REST.
-Java 21 · Quarkus 3.x · PostgreSQL 16 · Kafka (optional) · REST + WebSocket
+Java 21 · Quarkus 3.x · PostgreSQL 16 · Kafka · REST + WebSocket
 
 ## Stack constraints
 - Framework: Quarkus only. Never Spring Boot, Micronaut, or Spring annotations.
@@ -13,8 +13,7 @@ Java 21 · Quarkus 3.x · PostgreSQL 16 · Kafka (optional) · REST + WebSocket
 - Metrics: Quarkus Micrometer → Prometheus format. Never Dropwizard.
 - Logging: Structured JSON via JBoss Logging. Never System.out.println.
 - Config: application.properties + ENV overrides. 12-factor. Never hardcode values.
-- Kafka: quarkus-messaging-kafka, only active when kafka.enabled=true in config.
-  Fallback: in-process queue (java.util.concurrent.LinkedBlockingQueue) when disabled.
+- Kafka: quarkus-messaging-kafka. Always required — no optional flag, no fallback queue.
 - OpenAPI: code-first via quarkus-smallrye-openapi. Spec auto-generated from JAX-RS
   annotations and served at GET /q/openapi. Enrich with @Operation/@APIResponse/@Tag
   annotations where the generated output is unclear. Never hand-write openapi.yaml.
@@ -127,8 +126,13 @@ Things explicitly decided to defer — not forgotten, not in scope for MVP.
 - **Heartbeat position updates** — clients will send periodic position events (~every 15s). Do NOT write each one to Postgres. Buffer in Redis (already in stack), flush to Postgres on PAUSE or via a 30s background job.
 - **Multi-device sync** — broadcast playback events to other connected sessions of the same user.
 
+### Pipeline / Kafka
+- **`scrobble.events`** — produce from PlaybackWebSocket PLAY events for play history tracking.
+- **`watch.sync-requested`** — produce when user requests watch sync. Deferred until watch app is built.
+- **`watch.sync-ready`** — consume and notify watch client via WebSocket. Deferred until watch app is built.
+
 ### Library / Clients
-- **Subsonic 1.16.1 API** (`/rest/`) — deferred intentionally. Useful for migration tooling or compatibility with existing clients (Symfonium, Ultrasonic) if ever needed. Not a priority while building own app.
+- **Subsonic 1.16.1 API** (`/rest/`) — intentionally skipped, user is building own platform. Could be useful for migration tooling later.
 - **Spotify / Subsonic import** — migration tooling for users moving from other platforms. Post-launch feature.
 
 ### Auth

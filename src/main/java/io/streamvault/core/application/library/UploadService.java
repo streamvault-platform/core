@@ -3,6 +3,8 @@ package io.streamvault.core.application.library;
 import io.quarkus.hibernate.reactive.panache.Panache;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import io.streamvault.core.application.pipeline.MediaEventPublisher;
+import io.streamvault.core.application.pipeline.event.TrackUploadedEvent;
 import io.streamvault.core.application.storage.StorageBackend;
 import io.streamvault.core.domain.library.*;
 import io.vertx.mutiny.core.Vertx;
@@ -33,6 +35,8 @@ public class UploadService {
     @Inject
     StorageBackend storage;
     @Inject
+    MediaEventPublisher eventPublisher;
+    @Inject
     ArtistRepository artists;
     @Inject
     AlbumRepository albums;
@@ -55,7 +59,12 @@ public class UploadService {
         }
 
         return vertx.executeBlocking(() -> storeAndExtract(upload, ext))
-                .flatMap(metadata -> Panache.withTransaction(() -> upsertTrack(metadata)));
+                .flatMap(metadata -> Panache.withTransaction(() -> upsertTrack(metadata)))
+                .call(track -> {
+                    LOG.infof("action=track_uploaded trackId=%s filename=%s mimeType=%s", track.id, upload.fileName(), track.mimeType);
+                    return eventPublisher.publishTrackUploaded(
+                            new TrackUploadedEvent(track.id, track.filePath, track.mimeType, upload.fileName()));
+                });
     }
 
     private TrackMetadata storeAndExtract(FileUpload upload, String ext) {

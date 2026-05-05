@@ -20,6 +20,7 @@ import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.jboss.logging.Logger;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 
 import java.util.List;
@@ -29,6 +30,8 @@ import java.util.List;
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "Admin — Upload", description = "Admin-only endpoints for ingesting audio files into the library")
 public class AdminUploadResource {
+
+    private static final Logger LOG = Logger.getLogger(AdminUploadResource.class);
 
     @Inject
     UploadService uploadService;
@@ -62,9 +65,11 @@ public class AdminUploadResource {
             case LibraryError.UnsupportedFileType x ->
                     Response.status(422).entity(new ErrorResponse("UNSUPPORTED_FILE_TYPE",
                             "Unsupported file type: " + x.filename())).build();
-            case LibraryError.StorageError x ->
-                    Response.status(500).entity(new ErrorResponse("STORAGE_ERROR",
-                            "Failed to store file: " + x.message())).build();
+            case LibraryError.StorageError x -> {
+                LOG.errorf("upload storage failed: %s", x.message());
+                yield Response.status(500).entity(new ErrorResponse("STORAGE_ERROR",
+                        "Failed to store file: " + x.message())).build();
+            }
             case LibraryError.TrackNotFound x ->
                     Response.status(404).entity(new ErrorResponse("TRACK_NOT_FOUND", "Track not found")).build();
             case LibraryError.AlreadyInLibrary x ->
