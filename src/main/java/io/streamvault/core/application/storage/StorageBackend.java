@@ -4,35 +4,37 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 
+import java.time.Duration;
+import java.util.UUID;
+
 /**
  * Port for file storage. Implementations live in infra/storage/.
  * Selected at startup via streamvault.storage.backend config property.
+ *
+ * storedPath semantics are backend-specific:
+ *   filesystem → absolute path, e.g. /var/streamvault/media/uuid.mp3
+ *   s3         → object key,    e.g. originals/uuid.mp3
  */
 public interface StorageBackend {
 
-    /**
-     * Moves/uploads a file from the temp upload path to permanent storage.
-     *
-     * @param tempFile         path to the temporary uploaded file
-     * @param originalFilename original filename from the multipart upload
-     * @param extension        lowercase file extension including dot, e.g. ".mp3"
-     * @return the permanent identifier for the stored file (absolute path for
-     *         filesystem, object key for S3)
-     */
     String store(Path tempFile, String originalFilename, String extension);
 
-    /**
-     * Returns size and last-modified timestamp for the stored file.
-     * Throws {@link java.io.FileNotFoundException} if the path does not exist.
-     */
     StoredFileMetadata metadata(String storedPath) throws IOException;
 
-    /** Opens a stream over the entire file. */
     InputStream openFull(String storedPath) throws IOException;
 
-    /**
-     * Opens a stream limited to {@code length} bytes starting at {@code offset}.
-     * S3 implementations should map this to a native byte-range GET request.
-     */
     InputStream openRange(String storedPath, long offset, long length) throws IOException;
+
+    /** Returns a time-limited URL pipeline can use to GET the original file. */
+    String presignDownload(String storedPath, Duration expiry);
+
+    /** Returns a time-limited URL pipeline can use to PUT the transcoded file. */
+    String presignUpload(String storedPath, Duration expiry);
+
+    /**
+     * Returns the backend-specific storedPath for a track's transcoded AAC file.
+     * S3: object key  →  transcoded/{trackId}.aac
+     * Filesystem: absolute path under mediaPath
+     */
+    String transcodedStoredPath(UUID trackId);
 }
