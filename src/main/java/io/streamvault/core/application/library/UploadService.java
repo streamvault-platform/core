@@ -60,8 +60,11 @@ public class UploadService {
 
         return vertx.executeBlocking(() -> storeAndExtract(upload, ext))
                 .flatMap(metadata -> Panache.withTransaction(() -> upsertTrack(metadata)))
-                .call(track -> eventPublisher.publishTrackUploaded(
-                        new TrackUploadedEvent(track.id, track.filePath, track.mimeType, upload.fileName())));
+                .call(track -> {
+                    LOG.infof("action=track_uploaded trackId=%s filename=%s mimeType=%s", track.id, upload.fileName(), track.mimeType);
+                    return eventPublisher.publishTrackUploaded(
+                            new TrackUploadedEvent(track.id, track.filePath, track.mimeType, upload.fileName()));
+                });
     }
 
     private TrackMetadata storeAndExtract(FileUpload upload, String ext) {

@@ -18,6 +18,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.jboss.logging.Logger;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 
 import java.util.List;
@@ -29,6 +30,8 @@ import java.util.UUID;
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Library — Personal", description = "Manage the authenticated user's personal track library")
 public class UserLibraryResource {
+
+    private static final Logger LOG = Logger.getLogger(UserLibraryResource.class);
 
     @Inject UserLibraryService userLibraryService;
     @Inject JsonWebToken jwt;
@@ -80,8 +83,10 @@ public class UserLibraryResource {
                     Response.status(404).entity(new ErrorResponse("NOT_IN_LIBRARY", "Track not in your library")).build();
             case LibraryError.UnsupportedFileType x ->
                     Response.status(422).entity(new ErrorResponse("UNSUPPORTED_FILE_TYPE", "Unsupported file type")).build();
-            case LibraryError.StorageError x ->
-                    Response.status(500).entity(new ErrorResponse("STORAGE_ERROR", "Storage error")).build();
+            case LibraryError.StorageError x -> {
+                LOG.errorf("library storage failed: %s", x.message());
+                yield Response.status(500).entity(new ErrorResponse("STORAGE_ERROR", "Storage error")).build();
+            }
         };
     }
 

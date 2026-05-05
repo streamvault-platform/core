@@ -15,6 +15,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.jboss.logging.Logger;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 
 import java.util.UUID;
@@ -23,6 +24,8 @@ import java.util.UUID;
 @Authenticated
 @Tag(name = "Streaming", description = "Stream audio files with full and partial content support")
 public class StreamResource {
+
+    private static final Logger LOG = Logger.getLogger(StreamResource.class);
 
     @Inject
     StreamingService streamingService;
@@ -106,11 +109,13 @@ public class StreamResource {
                             .entity(new ErrorResponse("FILE_NOT_FOUND", "Audio file not found on server"))
                             .type(MediaType.APPLICATION_JSON)
                             .build();
-            case StreamError.ReadError e ->
-                    Response.status(500)
-                            .entity(new ErrorResponse("READ_ERROR", "Failed to read audio file"))
-                            .type(MediaType.APPLICATION_JSON)
-                            .build();
+            case StreamError.ReadError e -> {
+                LOG.errorf("stream read failed: %s", e.message());
+                yield Response.status(500)
+                        .entity(new ErrorResponse("READ_ERROR", "Failed to read audio file"))
+                        .type(MediaType.APPLICATION_JSON)
+                        .build();
+            }
         };
     }
 }

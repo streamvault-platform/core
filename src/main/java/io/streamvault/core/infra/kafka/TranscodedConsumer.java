@@ -15,7 +15,7 @@ public class TranscodedConsumer {
     public Uni<Void> consume(TranscodedEvent event) {
         // On-the-fly transcoding is post-MVP — serving originals for now.
         // This consumer exists so the pipeline can publish without error.
-        LOG.infof("Track %s transcoded → %s (%s, %d bytes)",
+        LOG.debugf("action=transcoded_received trackId=%s path=%s mimeType=%s bytes=%d",
                 event.trackId(), event.transcodedPath(), event.mimeType(), event.fileSizeBytes());
         return Uni.createFrom().voidItem();
     }
