@@ -10,7 +10,6 @@ import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.jboss.logging.Logger;
 
 import java.time.OffsetDateTime;
-import java.util.Optional;
 
 @ApplicationScoped
 public class MetadataReadyConsumer {
