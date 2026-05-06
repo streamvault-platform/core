@@ -71,6 +71,10 @@ class KafkaPipelineIT {
                 .findFirst().orElseThrow();
         assertEquals("audio/mpeg", event.mimeType());
         assertEquals("track.mp3", event.originalFilename());
+        assertNotNull(event.downloadUrl());
+        assertNotNull(event.uploadUrl());
+        assertNotNull(event.transcodedStoredPath());
+        assertTrue(event.transcodedStoredPath().contains(trackId));
     }
 
     @Test
@@ -102,11 +106,22 @@ class KafkaPipelineIT {
     }
 
     @Test
-    void transcoded_handledWithoutError() throws Exception {
+    void transcoded_storesPathAndMimeTypeInDatabase() throws Exception {
         String trackId = uploadTrack("track.mp3");
+        UUID id = UUID.fromString(trackId);
 
-        var event = new TranscodedEvent(
-                UUID.fromString(trackId), "/media/track.aac", "audio/aac", 1_024_000L);
+        var event = new TranscodedEvent(id, "/media/transcoded/track.aac", "audio/aac", 1_024_000L);
+        transcodedEmitter.send(event).await().indefinitely();
+
+        awaitUntil(() -> "/media/transcoded/track.aac".equals(transcodedPath(id)));
+
+        assertEquals("/media/transcoded/track.aac", transcodedPath(id));
+        assertEquals("audio/aac", transcodedMimeType(id));
+    }
+
+    @Test
+    void transcoded_unknownTrack_ignoredGracefully() throws Exception {
+        var event = new TranscodedEvent(UUID.randomUUID(), "/media/ghost.aac", "audio/aac", 512L);
         transcodedEmitter.send(event).await().indefinitely();
 
         Thread.sleep(2_000);
@@ -128,11 +143,23 @@ class KafkaPipelineIT {
     }
 
     private String trackTitle(UUID trackId) {
+        return trackColumn(trackId, "title");
+    }
+
+    private String transcodedPath(UUID trackId) {
+        return trackColumn(trackId, "transcoded_path");
+    }
+
+    private String transcodedMimeType(UUID trackId) {
+        return trackColumn(trackId, "transcoded_mime_type");
+    }
+
+    private String trackColumn(UUID trackId, String column) {
         try (var conn = ds.getConnection();
-             var ps = conn.prepareStatement("SELECT title FROM tracks WHERE id = ?")) {
+             var ps = conn.prepareStatement("SELECT " + column + " FROM tracks WHERE id = ?")) {
             ps.setObject(1, trackId);
             ResultSet rs = ps.executeQuery();
-            return rs.next() ? rs.getString("title") : "";
+            return rs.next() ? rs.getString(column) : null;
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }

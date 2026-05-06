@@ -62,8 +62,12 @@ public class UploadService {
                 .flatMap(metadata -> Panache.withTransaction(() -> upsertTrack(metadata)))
                 .call(track -> {
                     LOG.infof("action=track_uploaded trackId=%s filename=%s mimeType=%s", track.id, upload.fileName(), track.mimeType);
-                    return eventPublisher.publishTrackUploaded(
-                            new TrackUploadedEvent(track.id, track.filePath, track.mimeType, upload.fileName()));
+                    String downloadUrl = storage.presignDownload(track.filePath, java.time.Duration.ofHours(1));
+                    String transcodedPath = storage.transcodedStoredPath(track.id);
+                    String uploadUrl = storage.presignUpload(transcodedPath, java.time.Duration.ofHours(2));
+                    return eventPublisher.publishTrackUploaded(new TrackUploadedEvent(
+                            track.id, track.filePath, track.mimeType, upload.fileName(),
+                            downloadUrl, uploadUrl, transcodedPath));
                 });
     }
 

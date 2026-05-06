@@ -51,4 +51,10 @@ public class Track {
 
     @Column(name = "updated_at", nullable = false)
     public OffsetDateTime updatedAt = OffsetDateTime.now();
+
+    @Column(name = "transcoded_path", columnDefinition = "TEXT")
+    public String transcodedPath;
+
+    @Column(name = "transcoded_mime_type", length = 50)
+    public String transcodedMimeType;
 }

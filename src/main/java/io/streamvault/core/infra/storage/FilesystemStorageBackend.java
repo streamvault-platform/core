@@ -1,10 +1,12 @@
 package io.streamvault.core.infra.storage;
 
 import io.streamvault.core.application.library.LibraryException;
+import io.streamvault.core.application.storage.InternalUrlSigner;
 import io.streamvault.core.application.storage.StorageBackend;
 import io.streamvault.core.application.storage.StoredFileMetadata;
 import io.streamvault.core.domain.library.LibraryError;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.FileNotFoundException;
@@ -15,6 +17,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -23,6 +26,9 @@ public class FilesystemStorageBackend implements StorageBackend {
 
     @ConfigProperty(name = "streamvault.media.path")
     String mediaPath;
+
+    @Inject
+    InternalUrlSigner signer;
 
     @Override
     public String store(Path tempFile, String originalFilename, String extension) {
@@ -57,5 +63,21 @@ public class FilesystemStorageBackend implements StorageBackend {
         FileChannel channel = FileChannel.open(Path.of(storedPath), StandardOpenOption.READ);
         channel.position(offset);
         return new LimitedInputStream(Channels.newInputStream(channel), length);
+    }
+
+    @Override
+    public String presignDownload(String storedPath, Duration expiry) {
+        return signer.signedDownloadUrl(storedPath, expiry);
+    }
+
+    @Override
+    public String presignUpload(String storedPath, Duration expiry) {
+        return signer.signedUploadUrl(storedPath, expiry);
+    }
+
+    @Override
+    public String transcodedStoredPath(UUID trackId) {
+        return Path.of(mediaPath).resolve("transcoded").resolve(trackId + ".aac")
+                .toAbsolutePath().toString();
     }
 }
