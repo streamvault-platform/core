@@ -78,16 +78,24 @@ public class S3StorageBackend implements StorageBackend {
                 .build();
     }
 
+    private static final org.jboss.logging.Logger LOG = org.jboss.logging.Logger.getLogger(S3StorageBackend.class);
+
     @Override
     public String store(Path tempFile, String originalFilename, String extension) {
         requireConfigured();
         String key = "originals/" + UUID.randomUUID() + extension;
         try {
+            long fileSize = java.nio.file.Files.size(tempFile);
+            LOG.infof("s3.putObject bucket=%s key=%s endpoint=%s fileSize=%d fileExists=%b",
+                    bucketName, key, endpoint.orElse("?"), fileSize, java.nio.file.Files.exists(tempFile));
             s3.putObject(
                     PutObjectRequest.builder().bucket(bucketName).key(key).build(),
                     RequestBody.fromFile(tempFile));
+            LOG.infof("s3.putObject succeeded key=%s", key);
             return key;
         } catch (Exception e) {
+            LOG.errorf(e, "s3.putObject failed bucket=%s key=%s exceptionType=%s",
+                    bucketName, key, e.getClass().getName());
             throw new LibraryException(new LibraryError.StorageError(e.getMessage()));
         }
     }
