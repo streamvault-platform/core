@@ -71,7 +71,7 @@ public class UploadService {
         String storedPath = storage.store(tempFile, upload.fileName(), ext);
         return new TrackMetadata(
                 storedPath,
-                mimeTypeFor(tempFile),
+                mimeTypeFor(upload.fileName()),
                 size,
                 stripExtension(upload.fileName()));
     }
@@ -98,8 +98,8 @@ public class UploadService {
         return dot >= 0 ? filename.substring(0, dot) : filename;
     }
 
-    private String mimeTypeFor(Path path) {
-        String name = path.getFileName().toString().toLowerCase();
+    private String mimeTypeFor(String filename) {
+        String name = filename.toLowerCase();
         if (name.endsWith(".mp3"))  return "audio/mpeg";
         if (name.endsWith(".flac")) return "audio/flac";
         if (name.endsWith(".ogg"))  return "audio/ogg";
