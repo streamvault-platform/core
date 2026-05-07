@@ -66,12 +66,13 @@ public class UploadService {
     }
 
     private TrackMetadata storeFile(FileUpload upload, String ext) throws Exception {
-        String storedPath = storage.store(upload.uploadedFile(), upload.fileName(), ext);
-        Path path = Path.of(storedPath);
+        Path tempFile = upload.uploadedFile();
+        long size = Files.size(tempFile);
+        String storedPath = storage.store(tempFile, upload.fileName(), ext);
         return new TrackMetadata(
                 storedPath,
-                mimeTypeFor(path),
-                Files.size(path),
+                mimeTypeFor(tempFile),
+                size,
                 stripExtension(upload.fileName()));
     }
 
