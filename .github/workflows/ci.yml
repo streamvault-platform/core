@@ -3,11 +3,10 @@ name: CI / CD
 on:
   pull_request:
   push:
-    branches: [ develop, release ]
-    tags: [ "v*" ]
+    branches: [develop, release]
+    tags: ["v*"]
 
 jobs:
-
   # ── Compile & extract version (fail fast) ────────────────────────────────
   build:
     name: Build
@@ -68,10 +67,37 @@ jobs:
       - name: Run integration tests
         run: ./mvnw -B verify -DskipITs=false
 
+      - name: Upload JaCoCo data
+        uses: actions/upload-artifact@v5
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          retention-days: 1
+
+  # ── Coverage summary (after both test jobs pass) ──────────────────────────
+  coverage:
+    name: Coverage
+    needs: [test-unit, test-it]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download JaCoCo report
+        uses: actions/download-artifact@v5
+        with:
+          name: jacoco-report
+
+      - name: Print coverage summary
+        run: |
+          awk -F',' 'NR>1 {im+=$4; ic+=$5; bm+=$6; bc+=$7; lm+=$8; lc+=$9}
+          END {
+            printf "Instructions  %d/%d  (%.1f%%)\n", ic, im+ic, ic/(im+ic)*100
+            printf "Branches      %d/%d  (%.1f%%)\n", bc, bm+bc, bc/(bm+bc)*100
+            printf "Lines         %d/%d  (%.1f%%)\n", lc, lm+lc, lc/(lm+lc)*100
+          }' jacoco.csv
+
   # ── Build & push Docker image to GHCR ────────────────────────────────────
   docker:
     name: Build & push image
-    needs: [ build, test-unit, test-it ]
+    needs: [build, test-unit, test-it]
     if: >
       github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/release'
       || github.ref_type == 'tag'
