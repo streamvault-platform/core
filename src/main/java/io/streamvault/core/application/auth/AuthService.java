@@ -6,7 +6,8 @@ import io.smallrye.mutiny.Uni;
 import io.streamvault.core.domain.auth.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.jboss.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -14,7 +15,7 @@ import java.util.UUID;
 @ApplicationScoped
 public class AuthService {
 
-    private static final Logger LOG = Logger.getLogger(AuthService.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AuthService.class);
 
     @Inject
     UserRepository users;
@@ -34,7 +35,7 @@ public class AuthService {
             user.passwordHash = BcryptUtil.bcryptHash(password);
             user.role = "ADMIN";
             return users.persist(user)
-                    .invoke(u -> LOG.infof("action=register_admin userId=%s username=%s", u.id, u.username))
+                    .invoke(u -> LOG.info("action=register_admin userId={} username={}", u.id, u.username))
                     .flatMap(this::issueTokenPair);
         }));
     }
@@ -42,7 +43,7 @@ public class AuthService {
     public Uni<TokenResponse> login(String username, String password) {
         return Panache.withTransaction(() -> users.findByUsername(username).flatMap(opt -> {
             if (opt.isEmpty() || !BcryptUtil.matches(password, opt.get().passwordHash)) {
-                LOG.warnf("action=login result=rejected username=%s", username);
+                LOG.warn("action=login result=rejected username={}", username);
                 return Uni.createFrom().failure(
                         new AuthException(new AuthError.InvalidCredentials()));
             }
@@ -57,13 +58,13 @@ public class AuthService {
             String hash = tokenService.hashToken(rawToken);
             return refreshTokens.findByTokenHash(hash).flatMap(opt -> {
                 if (opt.isEmpty()) {
-                    LOG.warnf("action=token_refresh result=rejected reason=not_found");
+                    LOG.warn("action=token_refresh result=rejected reason=not_found");
                     return Uni.createFrom().failure(
                             new AuthException(new AuthError.TokenNotFound()));
                 }
                 var rt = opt.get();
                 if (rt.expiresAt.isBefore(OffsetDateTime.now())) {
-                    LOG.warnf("action=token_refresh result=rejected reason=expired userId=%s", rt.user.id);
+                    LOG.warn("action=token_refresh result=rejected reason=expired userId={}", rt.user.id);
                     return refreshTokens.deleteById(rt.id)
                             .flatMap(ignored -> Uni.createFrom().failure(
                                     new AuthException(new AuthError.TokenExpired())));

@@ -6,7 +6,6 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 
 import java.io.IOException;
@@ -51,7 +50,6 @@ public class InternalMediaResource {
 
     @PUT
     @Path("/upload")
-    @Consumes(MediaType.APPLICATION_OCTET_STREAM)
     @Blocking
     @Operation(hidden = true)
     public Response upload(

@@ -7,14 +7,15 @@ import io.streamvault.core.domain.library.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
-import org.jboss.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.OffsetDateTime;
 
 @ApplicationScoped
 public class MetadataReadyConsumer {
 
-    private static final Logger LOG = Logger.getLogger(MetadataReadyConsumer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MetadataReadyConsumer.class);
 
     @Inject TrackRepository tracks;
     @Inject ArtistRepository artists;
@@ -22,6 +23,9 @@ public class MetadataReadyConsumer {
 
     @Incoming("media-metadata-ready")
     public Uni<Void> consume(MetadataReadyEvent event) {
+        LOG.debug("action=kafka_consume topic=media.metadata-ready trackId={} title={} artist={} album={} year={} durationMs={} genre={}",
+                event.trackId(), event.title(), event.artist(), event.album(),
+                event.year(), event.durationMs(), event.genre());
         return Panache.withTransaction(() -> updateTrack(event));
     }
 
@@ -29,7 +33,7 @@ public class MetadataReadyConsumer {
         return tracks.findTrackById(event.trackId())
                 .flatMap(opt -> {
                     if (opt.isEmpty()) {
-                        LOG.warnf("Received media.metadata-ready for unknown track %s — ignoring", event.trackId());
+                        LOG.warn("Received media.metadata-ready for unknown track {} — ignoring", event.trackId());
                         return Uni.createFrom().voidItem();
                     }
                     Track track = opt.get();

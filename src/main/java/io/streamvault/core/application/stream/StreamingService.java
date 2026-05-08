@@ -5,6 +5,7 @@ import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import io.streamvault.core.application.storage.StorageBackend;
 import io.streamvault.core.application.storage.StoredFileMetadata;
+import io.streamvault.core.domain.library.SupportedMediaType;
 import io.streamvault.core.domain.library.Track;
 import io.streamvault.core.domain.library.TrackRepository;
 import io.streamvault.core.domain.stream.StreamError;
@@ -125,13 +126,8 @@ public class StreamingService {
     }
 
     private static String extensionFor(String mimeType) {
-        if (mimeType == null) return "";
-        return switch (mimeType) {
-            case "audio/mpeg" -> ".mp3";
-            case "audio/flac" -> ".flac";
-            case "audio/ogg" -> ".ogg";
-            case "audio/aac", "audio/mp4", "audio/x-m4a" -> ".m4a";
-            default -> "";
-        };
+        return SupportedMediaType.fromMimeType(mimeType)
+                .map(SupportedMediaType::primaryExtension)
+                .orElse("");
     }
 }

@@ -10,7 +10,8 @@ import io.streamvault.core.domain.library.*;
 import io.vertx.mutiny.core.Vertx;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.jboss.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 import java.nio.file.Files;
@@ -18,15 +19,11 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Set;
 
 @ApplicationScoped
 public class UploadService {
 
-    private static final Logger LOG = Logger.getLogger(UploadService.class);
-
-    private static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
-            ".mp3", ".flac", ".ogg", ".aac", ".m4a");
+    private static final Logger LOG = LoggerFactory.getLogger(UploadService.class);
 
     @Inject
     Vertx vertx;
@@ -47,7 +44,7 @@ public class UploadService {
         String filename = upload.fileName();
         String ext = extensionOf(filename).toLowerCase();
 
-        if (!SUPPORTED_EXTENSIONS.contains(ext)) {
+        if (SupportedMediaType.fromExtension(ext).isEmpty()) {
             return Uni.createFrom().failure(
                     new LibraryException(new LibraryError.UnsupportedFileType(filename)));
         }
@@ -55,10 +52,10 @@ public class UploadService {
         return vertx.executeBlocking(() -> storeFile(upload, ext))
                 .flatMap(meta -> Panache.withTransaction(() -> upsertTrack(meta)))
                 .call(track -> {
-                    LOG.infof("action=track_uploaded trackId=%s filename=%s mimeType=%s", track.id, upload.fileName(), track.mimeType);
-                    String downloadUrl = storage.presignDownload(track.filePath, Duration.ofHours(1));
+                    LOG.info("action=track_uploaded trackId={} filename={} mimeType={}", track.id, upload.fileName(), track.mimeType);
+                    String downloadUrl = storage.presignDownload(track.filePath, Duration.ofDays(7));
                     String transcodedPath = storage.transcodedStoredPath(track.id);
-                    String uploadUrl = storage.presignUpload(transcodedPath, Duration.ofHours(2));
+                    String uploadUrl = storage.presignUpload(transcodedPath, Duration.ofDays(7));
                     return eventPublisher.publishTrackUploaded(new TrackUploadedEvent(
                             track.id, track.filePath, track.mimeType, upload.fileName(),
                             downloadUrl, uploadUrl, transcodedPath));
@@ -71,7 +68,7 @@ public class UploadService {
         String storedPath = storage.store(tempFile, upload.fileName(), ext);
         return new TrackMetadata(
                 storedPath,
-                mimeTypeFor(upload.fileName()),
+                SupportedMediaType.fromExtension(ext).map(SupportedMediaType::mimeType).orElse("application/octet-stream"),
                 size,
                 stripExtension(upload.fileName()));
     }
@@ -98,12 +95,4 @@ public class UploadService {
         return dot >= 0 ? filename.substring(0, dot) : filename;
     }
 
-    private String mimeTypeFor(String filename) {
-        String name = filename.toLowerCase();
-        if (name.endsWith(".mp3"))  return "audio/mpeg";
-        if (name.endsWith(".flac")) return "audio/flac";
-        if (name.endsWith(".ogg"))  return "audio/ogg";
-        if (name.endsWith(".aac") || name.endsWith(".m4a")) return "audio/aac";
-        return "application/octet-stream";
-    }
 }

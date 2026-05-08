@@ -32,7 +32,7 @@ public class FilesystemStorageBackend implements StorageBackend {
 
     @Override
     public String store(Path tempFile, String originalFilename, String extension) {
-        Path dest = Path.of(mediaPath).resolve(UUID.randomUUID() + extension);
+        Path dest = Path.of(mediaPath).resolve("originals").resolve(UUID.randomUUID() + extension);
         try {
             Files.createDirectories(dest.getParent());
             Files.move(tempFile, dest);

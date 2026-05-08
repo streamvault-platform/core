@@ -20,7 +20,8 @@ import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-import org.jboss.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 
 import java.util.List;
@@ -31,7 +32,7 @@ import java.util.List;
 @Tag(name = "Admin — Upload", description = "Admin-only endpoints for ingesting audio files into the library")
 public class AdminUploadResource {
 
-        private static final Logger LOG = Logger.getLogger(AdminUploadResource.class);
+        private static final Logger LOG = LoggerFactory.getLogger(AdminUploadResource.class);
 
         @Inject
         UploadService uploadService;
@@ -45,7 +46,7 @@ public class AdminUploadResource {
         @APIResponse(responseCode = "403", description = "Caller is not an ADMIN")
         @APIResponse(responseCode = "422", description = "One or more files have an unsupported format")
         public Uni<Response> upload(UploadForm form) {
-                LOG.debugf("action=upload_received files=%d", form.files == null ? 0 : form.files.size());
+                LOG.debug("action=upload_received files={}", form.files == null ? 0 : form.files.size());
                 if (form.files == null || form.files.isEmpty()) {
                         return Uni.createFrom().item(
                                         Response.status(400)
@@ -67,7 +68,7 @@ public class AdminUploadResource {
                                 Response.status(422).entity(new ErrorResponse("UNSUPPORTED_FILE_TYPE",
                                                 "Unsupported file type: " + x.filename())).build();
                         case LibraryError.StorageError x -> {
-                                LOG.errorf("upload storage failed: %s", x.message());
+                                LOG.error("upload storage failed: {}", x.message());
                                 yield Response.status(500).entity(new ErrorResponse("STORAGE_ERROR",
                                                 "Failed to store file: " + x.message())).build();
                         }
