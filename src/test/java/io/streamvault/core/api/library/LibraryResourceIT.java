@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 @QuarkusTest
@@ -251,6 +252,66 @@ class LibraryResourceIT {
                 .then()
                 .statusCode(200)
                 .body("$", hasSize(0));
+    }
+
+    // ── Search — ranking (exact before fuzzy) ────────────────────────────────
+
+    @Test
+    void searchArtists_exactMatchRanksAboveFuzzy() throws SQLException {
+        try (var conn = ds.getConnection(); var stmt = conn.createStatement()) {
+            stmt.execute("INSERT INTO artists (id, name, created_at) VALUES (gen_random_uuid(), 'Beatle Club', NOW())");
+        }
+        var names = given()
+                .header("Authorization", "Bearer " + token)
+                .queryParam("q", "Beatles")
+                .get("/api/library/artists")
+                .then()
+                .statusCode(200)
+                .body("$", hasSize(greaterThanOrEqualTo(2)))
+                .extract().jsonPath().getList("name", String.class);
+
+        assertThat(names.get(0), equalTo("The Beatles"));
+    }
+
+    @Test
+    void searchAlbums_exactMatchRanksAboveFuzzy() throws SQLException {
+        try (var conn = ds.getConnection(); var stmt = conn.createStatement()) {
+            stmt.execute("INSERT INTO artists (id, name, created_at) VALUES (gen_random_uuid(), 'Unknown', NOW())");
+            stmt.execute("""
+                    INSERT INTO albums (id, title, artist_id, year, created_at)
+                    SELECT gen_random_uuid(), 'Abbey Rood', id, 1970, NOW() FROM artists WHERE name = 'Unknown'
+                    """);
+        }
+        var titles = given()
+                .header("Authorization", "Bearer " + token)
+                .queryParam("q", "Abbey Road")
+                .get("/api/library/albums")
+                .then()
+                .statusCode(200)
+                .body("$", hasSize(greaterThanOrEqualTo(2)))
+                .extract().jsonPath().getList("title", String.class);
+
+        assertThat(titles.get(0), equalTo("Abbey Road"));
+    }
+
+    @Test
+    void searchTracks_exactMatchRanksAboveFuzzy() throws SQLException {
+        try (var conn = ds.getConnection(); var stmt = conn.createStatement()) {
+            stmt.execute("""
+                    INSERT INTO tracks (id, file_path, title, artist_id, album_id, duration_ms, mime_type, created_at, updated_at)
+                    VALUES (gen_random_uuid(), '/originals/fuzzy.mp3', 'Hey Dude', '%s', '%s', 200000, 'audio/mpeg', NOW(), NOW())
+                    """.formatted(ARTIST_BEATLES, ALBUM_ABBEY));
+        }
+        var titles = given()
+                .header("Authorization", "Bearer " + token)
+                .queryParam("q", "Hey Jude")
+                .get("/api/library/tracks")
+                .then()
+                .statusCode(200)
+                .body("$", hasSize(greaterThanOrEqualTo(2)))
+                .extract().jsonPath().getList("title", String.class);
+
+        assertThat(titles.get(0), equalTo("Hey Jude"));
     }
 
     // ── Detail — get by ID ────────────────────────────────────────────────────

@@ -25,8 +25,8 @@ public class AlbumRepositoryImpl implements AlbumRepository, PanacheRepositoryBa
             LEFT JOIN artists ar ON a.artist_id = ar.id
             WHERE a.search_vector @@ websearch_to_tsquery('simple', :q)
                OR word_similarity(:q, a.title) > 0.3
-            ORDER BY GREATEST(
-                ts_rank_cd(a.search_vector, websearch_to_tsquery('simple', :q)),
+            ORDER BY (
+                ts_rank_cd(a.search_vector, websearch_to_tsquery('simple', :q)) +
                 word_similarity(:q, a.title)
             ) DESC
             """;

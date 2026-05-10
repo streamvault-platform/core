@@ -23,8 +23,8 @@ public class ArtistRepositoryImpl implements ArtistRepository, PanacheRepository
             FROM artists
             WHERE search_vector @@ websearch_to_tsquery('simple', :q)
                OR word_similarity(:q, name) > 0.3
-            ORDER BY GREATEST(
-                ts_rank_cd(search_vector, websearch_to_tsquery('simple', :q)),
+            ORDER BY (
+                ts_rank_cd(search_vector, websearch_to_tsquery('simple', :q)) +
                 word_similarity(:q, name)
             ) DESC
             """;

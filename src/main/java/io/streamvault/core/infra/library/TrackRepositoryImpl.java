@@ -31,8 +31,8 @@ public class TrackRepositoryImpl implements TrackRepository, PanacheRepositoryBa
             LEFT JOIN albums  al ON t.album_id  = al.id
             WHERE t.search_vector @@ websearch_to_tsquery('simple', :q)
                OR word_similarity(:q, t.title) > 0.3
-            ORDER BY GREATEST(
-                ts_rank_cd(t.search_vector, websearch_to_tsquery('simple', :q)),
+            ORDER BY (
+                ts_rank_cd(t.search_vector, websearch_to_tsquery('simple', :q)) +
                 word_similarity(:q, t.title)
             ) DESC
             """;
