@@ -23,6 +23,11 @@ public class UserRepositoryImpl implements UserRepository, PanacheRepositoryBase
     }
 
     @Override
+    public Uni<Boolean> hasAdminAccount() {
+        return count("role", "ADMIN").map(c -> c > 0);
+    }
+
+    @Override
     public Uni<User> persist(User user) {
         return persistAndFlush(user);
     }

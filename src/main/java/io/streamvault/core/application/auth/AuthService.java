@@ -2,6 +2,7 @@ package io.streamvault.core.application.auth;
 
 import io.quarkus.elytron.security.common.BcryptUtil;
 import io.quarkus.hibernate.reactive.panache.Panache;
+import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.smallrye.mutiny.Uni;
 import io.streamvault.core.domain.auth.*;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -23,6 +24,11 @@ public class AuthService {
     RefreshTokenRepository refreshTokens;
     @Inject
     TokenService tokenService;
+
+    @WithSession
+    public Uni<Boolean> isConfigured() {
+        return users.hasAdminAccount();
+    }
 
     public Uni<TokenResponse> registerFirstAdmin(String username, String password) {
         return Panache.withTransaction(() -> users.countAll().flatMap(count -> {
