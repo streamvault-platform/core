@@ -11,6 +11,8 @@ public interface TrackRepository {
     Uni<Optional<Track>> findTrackByIdWithDetails(UUID id);
     Uni<Optional<Track>> findByFilePath(String filePath);
     Uni<List<Track>> listAll(int page, int size);
+    Uni<List<Track>> listByAlbum(UUID albumId, int page, int size);
+    Uni<List<Track>> search(String q, int page, int size);
     Uni<Long> countAll();
     Uni<Track> persist(Track track);
     Uni<Track> update(Track track);
