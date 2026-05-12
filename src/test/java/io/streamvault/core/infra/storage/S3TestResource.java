@@ -1,4 +1,4 @@
-package io.streamvault.core.infra.storage;
+ package io.streamvault.core.infra.storage;
 
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
 import org.testcontainers.containers.GenericContainer;

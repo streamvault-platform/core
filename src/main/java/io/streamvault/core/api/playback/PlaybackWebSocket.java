@@ -23,9 +23,10 @@ public class PlaybackWebSocket {
     public Uni<Void> onMessage(PlaybackEventMessage msg) {
         UUID userId = UUID.fromString(jwt.getSubject());
         PlaybackEvent event = switch (msg.type()) {
-            case "PLAY"  -> new PlaybackEvent.Play(msg.trackId(), msg.positionMs());
-            case "PAUSE" -> new PlaybackEvent.Pause(msg.trackId(), msg.positionMs());
-            case "SEEK"  -> new PlaybackEvent.Seek(msg.trackId(), msg.positionMs());
+            case "PLAY"      -> new PlaybackEvent.Play(msg.trackId(), msg.positionMs());
+            case "PAUSE"     -> new PlaybackEvent.Pause(msg.trackId(), msg.positionMs());
+            case "SEEK"      -> new PlaybackEvent.Seek(msg.trackId(), msg.positionMs());
+            case "HEARTBEAT" -> new PlaybackEvent.Heartbeat(msg.trackId(), msg.positionMs());
             default -> throw new IllegalArgumentException("Unknown event type: " + msg.type());
         };
         return playbackService.handleEvent(userId, event);
