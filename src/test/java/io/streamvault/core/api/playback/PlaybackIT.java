@@ -97,9 +97,10 @@ class PlaybackIT {
     }
 
     @Test
-    void getState_afterSeek_positionUpdated() throws Exception {
+    void getState_afterSeekThenPause_positionUpdated() throws Exception {
         sendEvent(event("PLAY", trackId, 0));
         sendEvent(event("SEEK", trackId, 30000));
+        sendEvent(event("PAUSE", trackId, 30000));
 
         given()
                 .header("Authorization", "Bearer " + token)
@@ -107,7 +108,7 @@ class PlaybackIT {
                 .then()
                 .statusCode(200)
                 .body("positionMs", equalTo(30000))
-                .body("isPlaying", equalTo(true));
+                .body("isPlaying", equalTo(false));
     }
 
     @Test
