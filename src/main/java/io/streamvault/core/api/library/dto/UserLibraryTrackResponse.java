@@ -7,6 +7,8 @@ import java.util.UUID;
 
 public record UserLibraryTrackResponse(
         UUID trackId,
+        UUID artistId,
+        UUID albumId,
         String title,
         String artist,
         String album,
@@ -18,6 +20,8 @@ public record UserLibraryTrackResponse(
         var t = ult.track;
         return new UserLibraryTrackResponse(
                 t.id,
+                t.artist != null ? t.artist.id : null,
+                t.album != null ? t.album.id : null,
                 t.title,
                 t.artist != null ? t.artist.name : null,
                 t.album != null ? t.album.title : null,
