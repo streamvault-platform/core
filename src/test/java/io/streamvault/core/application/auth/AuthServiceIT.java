@@ -29,13 +29,13 @@ class AuthServiceIT {
         }
     }
 
-    // ── registerFirstAdmin ───────────────────────────────────────────────────
+    // ── register ───────────────────────────────────────────────────
 
     @Test
     @RunOnVertxContext
-    void registerFirstAdmin_returnsTokenPair(UniAsserter asserter) {
+    void register_returnsTokenPair(UniAsserter asserter) {
         asserter.assertThat(
-                () -> authService.registerFirstAdmin("admin", "Admin123!"),
+                () -> authService.register("admin", "Admin123!"),
                 result -> {
                     assertThat(result.accessToken()).isNotBlank();
                     assertThat(result.refreshToken()).isNotBlank();
@@ -44,15 +44,25 @@ class AuthServiceIT {
 
     @Test
     @RunOnVertxContext
-    void registerFirstAdmin_secondCallFails(UniAsserter asserter) {
+    void register_duplicateUsername_fails(UniAsserter asserter) {
         asserter
-                .execute(() -> authService.registerFirstAdmin("admin", "Admin123!"))
+                .execute(() -> authService.register("admin", "Admin123!"))
                 .assertFailedWith(
-                        () -> authService.registerFirstAdmin("admin2", "Admin456!"),
+                        () -> authService.register("admin", "OtherPass456!"),
                         e -> assertThat(e)
                                 .isInstanceOf(AuthException.class)
                                 .satisfies(ex -> assertThat(((AuthException) ex).error())
-                                        .isInstanceOf(AuthError.FirstAdminAlreadyExists.class)));
+                                        .isInstanceOf(AuthError.UsernameAlreadyTaken.class)));
+    }
+
+    @Test
+    @RunOnVertxContext
+    void register_differentUsername_succeeds(UniAsserter asserter) {
+        asserter
+                .execute(() -> authService.register("admin", "Admin123!"))
+                .execute(() -> authService.register("admin2", "Admin456!"))
+                .assertThat(() -> authService.login("admin2", "Admin456!"),
+                        result -> assertThat(result.accessToken()).isNotBlank());
     }
 
     // ── login ────────────────────────────────────────────────────────────────
@@ -61,7 +71,7 @@ class AuthServiceIT {
     @RunOnVertxContext
     void login_withCorrectCredentials_returnsTokenPair(UniAsserter asserter) {
         asserter
-                .execute(() -> authService.registerFirstAdmin("admin", "Admin123!"))
+                .execute(() -> authService.register("admin", "Admin123!"))
                 .assertThat(
                         () -> authService.login("admin", "Admin123!"),
                         result -> {
@@ -74,7 +84,7 @@ class AuthServiceIT {
     @RunOnVertxContext
     void login_withWrongPassword_fails(UniAsserter asserter) {
         asserter
-                .execute(() -> authService.registerFirstAdmin("admin", "Admin123!"))
+                .execute(() -> authService.register("admin", "Admin123!"))
                 .assertFailedWith(
                         () -> authService.login("admin", "WrongPassword1!"),
                         e -> assertThat(e)
@@ -101,7 +111,7 @@ class AuthServiceIT {
     void refresh_withValidToken_returnsNewTokenPair(UniAsserter asserter) {
         asserter
                 .assertThat(
-                        () -> authService.registerFirstAdmin("admin", "Admin123!"),
+                        () -> authService.register("admin", "Admin123!"),
                         initial -> asserter.putData("token", initial.refreshToken()))
                 .assertThat(
                         () -> authService.refresh((String) asserter.getData("token")),
@@ -116,7 +126,7 @@ class AuthServiceIT {
     void refresh_rotatesToken_oldTokenNoLongerValid(UniAsserter asserter) {
         asserter
                 .assertThat(
-                        () -> authService.registerFirstAdmin("admin", "Admin123!"),
+                        () -> authService.register("admin", "Admin123!"),
                         initial -> asserter.putData("token", initial.refreshToken()))
                 .execute(() -> authService.refresh((String) asserter.getData("token")))
                 .assertFailedWith(
@@ -145,7 +155,7 @@ class AuthServiceIT {
     void logout_invalidatesRefreshToken(UniAsserter asserter) {
         asserter
                 .assertThat(
-                        () -> authService.registerFirstAdmin("admin", "Admin123!"),
+                        () -> authService.register("admin", "Admin123!"),
                         tokens -> {
                             asserter.putData("refreshToken", tokens.refreshToken());
                             asserter.putData("userId", extractUserId(tokens.accessToken()));

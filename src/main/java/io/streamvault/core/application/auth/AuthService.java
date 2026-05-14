@@ -30,18 +30,18 @@ public class AuthService {
         return users.hasAdminAccount();
     }
 
-    public Uni<TokenResponse> registerFirstAdmin(String username, String password) {
-        return Panache.withTransaction(() -> users.countAll().flatMap(count -> {
-            if (count > 0) {
+    public Uni<TokenResponse> register(String username, String password) {
+        return Panache.withTransaction(() -> users.findByUsername(username).flatMap(existing -> {
+            if (existing.isPresent()) {
                 return Uni.createFrom().failure(
-                        new AuthException(new AuthError.FirstAdminAlreadyExists()));
+                        new AuthException(new AuthError.UsernameAlreadyTaken()));
             }
             var user = new User();
             user.username = username;
             user.passwordHash = BcryptUtil.bcryptHash(password);
             user.role = "ADMIN";
             return users.persist(user)
-                    .invoke(u -> LOG.info("action=register_admin userId={} username={}", u.id, u.username))
+                    .invoke(u -> LOG.info("action=register userId={} username={}", u.id, u.username))
                     .flatMap(this::issueTokenPair);
         }));
     }
