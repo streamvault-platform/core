@@ -67,8 +67,8 @@ public class PlaybackService {
                 .replaceWithVoid();
     }
 
-    // Every 30s: flush all dirty users' buffered positions to Postgres
-    @Scheduled(every = "30s")
+    // Every 15s: flush all dirty users' buffered positions to Postgres
+    @Scheduled(every = "15s")
     void flushDirtyPositions() {
         redis.set(String.class).smembers(DIRTY_SET)
                 .flatMap(userIds -> Uni.join().all(
