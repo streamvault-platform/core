@@ -33,11 +33,11 @@ public class AuthResource {
 
     @POST
     @Path("/register")
-    @Operation(summary = "Register first admin", description = "One-time registration of the initial admin user. Returns 409 if an admin already exists.")
-    @APIResponse(responseCode = "201", description = "Admin created, tokens returned")
-    @APIResponse(responseCode = "409", description = "Admin already registered")
+    @Operation(summary = "Register", description = "Create a new admin account. Returns 409 if the username is already taken.")
+    @APIResponse(responseCode = "201", description = "User created, tokens returned")
+    @APIResponse(responseCode = "409", description = "Username already taken")
     public Uni<Response> register(@Valid RegisterRequest req) {
-        return authService.registerFirstAdmin(req.username(), req.password())
+        return authService.register(req.username(), req.password())
                 .map(token -> Response.status(201).entity(token).build());
     }
 
@@ -77,8 +77,8 @@ public class AuthResource {
     @ServerExceptionMapper
     public Response handleAuthException(AuthException e) {
         return switch (e.error()) {
-            case AuthError.FirstAdminAlreadyExists x ->
-                    Response.status(409).entity(new ErrorResponse("ADMIN_EXISTS", "Admin user already registered")).build();
+            case AuthError.UsernameAlreadyTaken x ->
+                    Response.status(409).entity(new ErrorResponse("USERNAME_TAKEN", "Username already taken")).build();
             case AuthError.InvalidCredentials x ->
                     Response.status(401).entity(new ErrorResponse("INVALID_CREDENTIALS", "Invalid username or password")).build();
             case AuthError.TokenExpired x ->

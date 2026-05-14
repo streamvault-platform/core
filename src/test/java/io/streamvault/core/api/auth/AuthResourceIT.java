@@ -48,11 +48,11 @@ class AuthResourceIT {
 
         given()
                 .contentType(ContentType.JSON)
-                .body(new RegisterRequest("admin2", "Admin456!"))
+                .body(new RegisterRequest("admin", "Admin456!"))
                 .when().post("/api/auth/register")
                 .then()
                 .statusCode(409)
-                .body("code", equalTo("ADMIN_EXISTS"));
+                .body("code", equalTo("USERNAME_TAKEN"));
     }
 
     @Test
