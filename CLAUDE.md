@@ -2,7 +2,7 @@
 
 ## Project
 Core API for Streamvault — self-hostable music streaming platform.
-Java 21 · Quarkus 3.x · PostgreSQL 16 · Kafka · REST + WebSocket
+Java 25 · Quarkus 3.x · PostgreSQL 16 · Kafka · REST + WebSocket
 
 Handles: auth, media library, file upload/streaming, WebSocket playback state, watch sync.
 For platform-wide scope and Kafka topic definitions, see the root CLAUDE.md.
