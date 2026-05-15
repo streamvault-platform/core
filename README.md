@@ -1,7 +1,7 @@
 # streamvault-core
 
 [![CI](https://github.com/streamvault-platform/core/actions/workflows/ci.yml/badge.svg)](https://github.com/streamvault-platform/core/actions/workflows/ci.yml)
-![Java](https://img.shields.io/badge/java-21-orange)
+![Java](https://img.shields.io/badge/java-25-orange)
 ![Quarkus](https://img.shields.io/badge/quarkus-3.x-blueviolet)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
