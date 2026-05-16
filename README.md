@@ -7,7 +7,7 @@
 
 Core API for [Streamvault](https://github.com/streamvault-app) — self-hostable music streaming with native smartwatch sync.
 
-**Java 21 · Quarkus 3.x · PostgreSQL 16 · Kafka · RustFS**
+**Java 25 · Quarkus 3.x · PostgreSQL 18 · Kafka · RustFS**
 
 Handles auth, the media library, file upload, audio streaming, and WebSocket playback state. Part of a multi-repo platform — see [streamvault-infra](../infra) to run the full stack.
 
