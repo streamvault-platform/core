@@ -66,6 +66,15 @@ public class TrackRepositoryImpl implements TrackRepository, PanacheRepositoryBa
     }
 
     @Override
+    public Uni<List<Track>> listByArtist(UUID artistId, int page, int size) {
+        return find(
+                "SELECT t FROM Track t JOIN FETCH t.artist a LEFT JOIN FETCH t.album " +
+                "WHERE a.id = ?1 AND t.album IS NULL",
+                artistId
+        ).page(page, size).list();
+    }
+
+    @Override
     public Uni<List<Track>> search(String q, int page, int size) {
         return sf.withSession(session ->
                 session.createNativeQuery(SEARCH_SQL)

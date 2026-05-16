@@ -73,6 +73,7 @@ public class LibraryResource {
     public Uni<List<TrackResponse>> listTracks(
             @Parameter(description = "Full-text search query (tsvector + trigram fuzzy)") @QueryParam("q") String q,
             @Parameter(description = "Filter by album UUID") @QueryParam("albumId") UUID albumId,
+            @Parameter(description = "Filter by artist UUID") @QueryParam("artistId") UUID artistId,
             @Parameter(description = "Zero-based page index") @QueryParam("page") @DefaultValue("0") int page,
             @Parameter(description = "Page size (max 200)") @QueryParam("size") @DefaultValue("20") int size) {
 
@@ -82,6 +83,10 @@ public class LibraryResource {
         }
         if (albumId != null) {
             return Panache.withTransaction(() -> tracks.listByAlbum(albumId, page, size))
+                    .map(list -> list.stream().map(TrackResponse::from).toList());
+        }
+        if (artistId != null) {
+            return Panache.withTransaction(() -> tracks.listByArtist(artistId, page, size))
                     .map(list -> list.stream().map(TrackResponse::from).toList());
         }
         return Panache.withTransaction(() -> tracks.listAll(page, size))
