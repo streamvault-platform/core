@@ -8,6 +8,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
@@ -53,29 +54,45 @@ public class S3StorageBackend implements StorageBackend {
 
     @PostConstruct
     void init() {
-        if (endpoint.isEmpty()) return;
+        bucketName = bucket.orElseThrow(() ->
+                new IllegalStateException("streamvault.s3.bucket is required"));
 
-        var credentials = StaticCredentialsProvider.create(
-                AwsBasicCredentials.create(accessKey.orElseThrow(), secretKey.orElseThrow()));
+        if (endpoint.isPresent()) {
+            // Self-hosted S3 (RustFS, MinIO, etc.): static credentials + endpoint override + path-style
+            var credentials = StaticCredentialsProvider.create(
+                    AwsBasicCredentials.create(
+                            accessKey.orElseThrow(() -> new IllegalStateException("streamvault.s3.access-key is required when endpoint is set")),
+                            secretKey.orElseThrow(() -> new IllegalStateException("streamvault.s3.secret-key is required when endpoint is set"))));
+            var s3Config = S3Configuration.builder().pathStyleAccessEnabled(true).build();
+            var endpointUri = URI.create(endpoint.get());
 
-        var s3Config = S3Configuration.builder().pathStyleAccessEnabled(true).build();
-        var endpointUri = URI.create(endpoint.get());
-        bucketName = bucket.orElseThrow();
+            s3 = S3Client.builder()
+                    .endpointOverride(endpointUri)
+                    .credentialsProvider(credentials)
+                    .region(Region.of(region))
+                    .serviceConfiguration(s3Config)
+                    .httpClient(UrlConnectionHttpClient.create())
+                    .build();
 
-        s3 = S3Client.builder()
-                .endpointOverride(endpointUri)
-                .credentialsProvider(credentials)
-                .region(Region.of(region))
-                .serviceConfiguration(s3Config)
-                .httpClient(UrlConnectionHttpClient.create())
-                .build();
+            presigner = S3Presigner.builder()
+                    .endpointOverride(endpointUri)
+                    .credentialsProvider(credentials)
+                    .region(Region.of(region))
+                    .serviceConfiguration(s3Config)
+                    .build();
+        } else {
+            // Real AWS S3: default credential chain (IRSA, env vars, instance profile)
+            s3 = S3Client.builder()
+                    .region(Region.of(region))
+                    .credentialsProvider(DefaultCredentialsProvider.create())
+                    .httpClient(UrlConnectionHttpClient.create())
+                    .build();
 
-        presigner = S3Presigner.builder()
-                .endpointOverride(endpointUri)
-                .credentialsProvider(credentials)
-                .region(Region.of(region))
-                .serviceConfiguration(s3Config)
-                .build();
+            presigner = S3Presigner.builder()
+                    .region(Region.of(region))
+                    .credentialsProvider(DefaultCredentialsProvider.create())
+                    .build();
+        }
     }
 
     private static final org.jboss.logging.Logger LOG = org.jboss.logging.Logger.getLogger(S3StorageBackend.class);
