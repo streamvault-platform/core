@@ -31,18 +31,24 @@ public class AuthService {
     }
 
     public Uni<TokenResponse> register(String username, String password) {
-        return Panache.withTransaction(() -> users.findByUsername(username).flatMap(existing -> {
-            if (existing.isPresent()) {
+        return Panache.withTransaction(() -> users.hasAdminAccount().flatMap(configured -> {
+            if (configured) {
                 return Uni.createFrom().failure(
-                        new AuthException(new AuthError.UsernameAlreadyTaken()));
+                        new AuthException(new AuthError.AlreadyConfigured()));
             }
-            var user = new User();
-            user.username = username;
-            user.passwordHash = BcryptUtil.bcryptHash(password);
-            user.role = "ADMIN";
-            return users.persist(user)
-                    .invoke(u -> LOG.info("action=register userId={} username={}", u.id, u.username))
-                    .flatMap(this::issueTokenPair);
+            return users.findByUsername(username).flatMap(existing -> {
+                if (existing.isPresent()) {
+                    return Uni.createFrom().failure(
+                            new AuthException(new AuthError.UsernameAlreadyTaken()));
+                }
+                var user = new User();
+                user.username = username;
+                user.passwordHash = BcryptUtil.bcryptHash(password);
+                user.role = Role.ADMIN;
+                return users.persist(user)
+                        .invoke(u -> LOG.info("action=register userId={} username={}", u.id, u.username))
+                        .flatMap(this::issueTokenPair);
+            });
         }));
     }
 

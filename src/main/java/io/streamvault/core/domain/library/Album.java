@@ -1,5 +1,6 @@
 package io.streamvault.core.domain.library;
 
+import io.streamvault.core.domain.auth.User;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -23,6 +24,10 @@ public class Album {
 
     @Column(name = "artwork_path", columnDefinition = "TEXT")
     public String artworkPath;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id")
+    public User owner;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     public OffsetDateTime createdAt = OffsetDateTime.now();

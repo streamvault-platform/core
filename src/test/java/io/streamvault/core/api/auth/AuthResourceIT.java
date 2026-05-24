@@ -43,16 +43,25 @@ class AuthResourceIT {
     }
 
     @Test
-    void register_secondCall_returnsConflict() {
+    void register_whenAlreadyConfigured_returnsServerConfigured() {
         registerAdmin();
 
         given()
                 .contentType(ContentType.JSON)
-                .body(new RegisterRequest("admin", "Admin456!"))
+                .body(new RegisterRequest("otheruser", "Other456!"))
                 .when().post("/api/auth/register")
                 .then()
                 .statusCode(409)
-                .body("code", equalTo("USERNAME_TAKEN"));
+                .body("code", equalTo("SERVER_CONFIGURED"));
+    }
+
+    @Test
+    void register_firstUser_getsAdminRoleInToken() {
+        String token = registerAdmin();
+        // decode groups claim from JWT payload
+        String payload = new String(java.util.Base64.getUrlDecoder()
+                .decode(token.split("\\.")[1]));
+        org.assertj.core.api.Assertions.assertThat(payload).contains("ADMIN");
     }
 
     @Test

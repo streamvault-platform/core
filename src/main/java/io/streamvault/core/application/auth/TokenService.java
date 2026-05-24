@@ -29,7 +29,7 @@ public class TokenService {
         return Jwt.issuer(issuer)
                 .subject(user.id.toString())
                 .claim("upn", user.username)
-                .groups(Set.of(user.role))
+                .groups(Set.of(user.role.name()))
                 .expiresIn(Duration.ofMinutes(accessTokenTtlMinutes))
                 .sign();
     }

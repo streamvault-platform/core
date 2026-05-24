@@ -15,6 +15,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -25,17 +26,18 @@ import org.slf4j.LoggerFactory;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 
 import java.util.List;
+import java.util.UUID;
 
 @Path("/admin/upload")
-@RolesAllowed("ADMIN")
+@RolesAllowed({"ADMIN", "ARTIST"})
 @Produces(MediaType.APPLICATION_JSON)
-@Tag(name = "Admin — Upload", description = "Admin-only endpoints for ingesting audio files into the library")
+@Tag(name = "Admin — Upload", description = "Endpoints for ingesting audio files into the library (ADMIN or ARTIST)")
 public class AdminUploadResource {
 
         private static final Logger LOG = LoggerFactory.getLogger(AdminUploadResource.class);
 
-        @Inject
-        UploadService uploadService;
+        @Inject UploadService uploadService;
+        @Inject JsonWebToken jwt;
 
         @POST
         @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -54,7 +56,8 @@ public class AdminUploadResource {
                                                                         "At least one file is required"))
                                                         .build());
                 }
-                return uploadService.processUploads(form.files)
+                UUID callerId = UUID.fromString(jwt.getSubject());
+                return uploadService.processUploads(form.files, callerId)
                                 .map(tracks -> {
                                         List<UploadResponse> body = tracks.stream().map(UploadResponse::from).toList();
                                         return Response.status(201).entity(body).build();

@@ -6,6 +6,8 @@ import io.smallrye.mutiny.Uni;
 import io.streamvault.core.application.pipeline.MediaEventPublisher;
 import io.streamvault.core.application.pipeline.event.TrackUploadedEvent;
 import io.streamvault.core.application.storage.StorageBackend;
+import io.streamvault.core.domain.auth.User;
+import io.streamvault.core.domain.auth.UserRepository;
 import io.streamvault.core.domain.library.*;
 import io.vertx.mutiny.core.Vertx;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,6 +21,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @ApplicationScoped
 public class UploadService {
@@ -33,14 +36,17 @@ public class UploadService {
     MediaEventPublisher eventPublisher;
     @Inject
     TrackRepository tracks;
+    @Inject
+    UserRepository users;
 
-    public Uni<List<Track>> processUploads(List<FileUpload> uploads) {
-        return Multi.createFrom().iterable(uploads)
-                .onItem().transformToUniAndConcatenate(this::processOne)
-                .collect().asList();
+    public Uni<List<Track>> processUploads(List<FileUpload> uploads, UUID callerId) {
+        return Panache.withSession(() -> users.findUserById(callerId))
+                .flatMap(caller -> Multi.createFrom().iterable(uploads)
+                        .onItem().transformToUniAndConcatenate(upload -> processOne(upload, caller.orElse(null)))
+                        .collect().asList());
     }
 
-    private Uni<Track> processOne(FileUpload upload) {
+    private Uni<Track> processOne(FileUpload upload, User caller) {
         String filename = upload.fileName();
         String ext = extensionOf(filename).toLowerCase();
 
@@ -50,7 +56,7 @@ public class UploadService {
         }
 
         return vertx.executeBlocking(() -> storeFile(upload, ext))
-                .flatMap(meta -> Panache.withTransaction(() -> upsertTrack(meta)))
+                .flatMap(meta -> Panache.withTransaction(() -> upsertTrack(meta, caller)))
                 .call(track -> {
                     LOG.info("action=track_uploaded trackId={} filename={} mimeType={}", track.id, upload.fileName(), track.mimeType);
                     String downloadUrl = storage.presignDownload(track.filePath, Duration.ofDays(7));
@@ -73,7 +79,7 @@ public class UploadService {
                 stripExtension(upload.fileName()));
     }
 
-    private Uni<Track> upsertTrack(TrackMetadata meta) {
+    private Uni<Track> upsertTrack(TrackMetadata meta, User caller) {
         return tracks.findByFilePath(meta.filePath()).flatMap(opt -> {
             Track t = opt.orElseGet(Track::new);
             t.filePath = meta.filePath();
@@ -81,6 +87,9 @@ public class UploadService {
             t.mimeType = meta.mimeType();
             t.fileSize = meta.fileSize();
             t.updatedAt = OffsetDateTime.now();
+            if (t.owner == null) {
+                t.owner = caller;
+            }
             return opt.isPresent() ? tracks.update(t) : tracks.persist(t);
         });
     }

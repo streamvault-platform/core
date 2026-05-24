@@ -44,7 +44,8 @@ class AuthServiceIT {
 
     @Test
     @RunOnVertxContext
-    void register_duplicateUsername_fails(UniAsserter asserter) {
+    void register_secondCall_failsWithAlreadyConfigured(UniAsserter asserter) {
+        // Register guard runs before username check: any second call → AlreadyConfigured
         asserter
                 .execute(() -> authService.register("admin", "Admin123!"))
                 .assertFailedWith(
@@ -52,17 +53,32 @@ class AuthServiceIT {
                         e -> assertThat(e)
                                 .isInstanceOf(AuthException.class)
                                 .satisfies(ex -> assertThat(((AuthException) ex).error())
-                                        .isInstanceOf(AuthError.UsernameAlreadyTaken.class)));
+                                        .isInstanceOf(AuthError.AlreadyConfigured.class)));
     }
 
     @Test
     @RunOnVertxContext
-    void register_differentUsername_succeeds(UniAsserter asserter) {
+    void register_whenAlreadyConfigured_fails(UniAsserter asserter) {
         asserter
                 .execute(() -> authService.register("admin", "Admin123!"))
-                .execute(() -> authService.register("admin2", "Admin456!"))
-                .assertThat(() -> authService.login("admin2", "Admin456!"),
-                        result -> assertThat(result.accessToken()).isNotBlank());
+                .assertFailedWith(
+                        () -> authService.register("admin2", "Admin456!"),
+                        e -> assertThat(e)
+                                .isInstanceOf(AuthException.class)
+                                .satisfies(ex -> assertThat(((AuthException) ex).error())
+                                        .isInstanceOf(AuthError.AlreadyConfigured.class)));
+    }
+
+    @Test
+    @RunOnVertxContext
+    void register_setsAdminRole(UniAsserter asserter) {
+        asserter.assertThat(
+                () -> authService.register("admin", "Admin123!"),
+                tokens -> {
+                    String payload = new String(java.util.Base64.getUrlDecoder()
+                            .decode(tokens.accessToken().split("\\.")[1]));
+                    assertThat(payload).contains("ADMIN");
+                });
     }
 
     // ── login ────────────────────────────────────────────────────────────────
