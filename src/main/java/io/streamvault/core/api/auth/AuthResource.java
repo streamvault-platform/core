@@ -33,9 +33,9 @@ public class AuthResource {
 
     @POST
     @Path("/register")
-    @Operation(summary = "Register", description = "Create a new admin account. Returns 409 if the username is already taken.")
-    @APIResponse(responseCode = "201", description = "User created, tokens returned")
-    @APIResponse(responseCode = "409", description = "Username already taken")
+    @Operation(summary = "Register", description = "Create the initial admin account on a fresh install. Returns 409 if the server is already configured or the username is taken.")
+    @APIResponse(responseCode = "201", description = "Admin account created, tokens returned")
+    @APIResponse(responseCode = "409", description = "Server already configured, or username already taken")
     public Uni<Response> register(@Valid RegisterRequest req) {
         return authService.register(req.username(), req.password())
                 .map(token -> Response.status(201).entity(token).build());
@@ -79,6 +79,8 @@ public class AuthResource {
         return switch (e.error()) {
             case AuthError.UsernameAlreadyTaken x ->
                     Response.status(409).entity(new ErrorResponse("USERNAME_TAKEN", "Username already taken")).build();
+            case AuthError.AlreadyConfigured x ->
+                    Response.status(409).entity(new ErrorResponse("SERVER_CONFIGURED", "Server already has an admin account — use the admin API to create users")).build();
             case AuthError.InvalidCredentials x ->
                     Response.status(401).entity(new ErrorResponse("INVALID_CREDENTIALS", "Invalid username or password")).build();
             case AuthError.TokenExpired x ->

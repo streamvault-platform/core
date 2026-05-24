@@ -1,5 +1,6 @@
 package io.streamvault.core.domain.library;
 
+import io.streamvault.core.domain.auth.User;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -57,4 +58,8 @@ public class Track {
 
     @Column(name = "transcoded_mime_type", length = 50)
     public String transcodedMimeType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id")
+    public User owner;
 }

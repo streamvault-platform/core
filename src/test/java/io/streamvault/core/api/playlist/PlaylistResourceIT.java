@@ -3,6 +3,7 @@ package io.streamvault.core.api.playlist;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
+import io.streamvault.core.api.auth.dto.LoginRequest;
 import io.streamvault.core.api.auth.dto.RegisterRequest;
 import io.streamvault.core.api.playlist.dto.AddPlaylistTrackRequest;
 import io.streamvault.core.api.playlist.dto.CreatePlaylistRequest;
@@ -53,10 +54,16 @@ class PlaylistResourceIT {
                 .post("/api/auth/register")
                 .jsonPath().getString("accessToken");
 
+        given()
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(ContentType.JSON)
+                .body("{\"username\":\"user2\",\"password\":\"Password123!\",\"role\":\"USER\"}")
+                .post("/api/admin/users");
+
         otherUserToken = given()
                 .contentType(ContentType.JSON)
-                .body(new RegisterRequest("user2", "Password123!"))
-                .post("/api/auth/register")
+                .body(new LoginRequest("user2", "Password123!"))
+                .post("/api/auth/login")
                 .jsonPath().getString("accessToken");
 
         // Upload tracks

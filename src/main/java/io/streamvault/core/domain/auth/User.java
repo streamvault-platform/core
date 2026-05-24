@@ -18,8 +18,9 @@ public class User {
     @Column(name = "password_hash", nullable = false, length = 255)
     public String passwordHash;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    public String role = "USER";
+    public Role role = Role.USER;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     public OffsetDateTime createdAt = OffsetDateTime.now();
