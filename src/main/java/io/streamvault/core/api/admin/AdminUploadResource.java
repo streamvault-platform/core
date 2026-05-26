@@ -86,6 +86,9 @@ public class AdminUploadResource {
                         case LibraryError.NotInLibrary x ->
                                 Response.status(404).entity(new ErrorResponse("NOT_IN_LIBRARY", "Track not in library"))
                                                 .build();
+                        case LibraryError.AlbumNotFound x ->
+                                Response.status(404).entity(new ErrorResponse("ALBUM_NOT_FOUND", "Album not found"))
+                                                .build();
                 };
         }
 }

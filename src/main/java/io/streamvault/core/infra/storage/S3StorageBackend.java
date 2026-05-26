@@ -177,6 +177,32 @@ public class S3StorageBackend implements StorageBackend {
         return "transcoded/" + trackId + ".aac";
     }
 
+    @Override
+    public String storeCoverArt(Path tempFile, UUID albumId, String extension) {
+        requireConfigured();
+        String key = "covers/" + albumId + extension;
+        try {
+            s3.putObject(
+                    PutObjectRequest.builder().bucket(bucketName).key(key).build(),
+                    RequestBody.fromFile(tempFile));
+            return key;
+        } catch (Exception e) {
+            LOG.errorf(e, "s3.putObject (cover) failed bucket=%s key=%s", bucketName, key);
+            throw new LibraryException(new LibraryError.StorageError(e.getMessage()));
+        }
+    }
+
+    @Override
+    public void delete(String storedPath) {
+        requireConfigured();
+        try {
+            s3.deleteObject(DeleteObjectRequest.builder().bucket(bucketName).key(storedPath).build());
+        } catch (NoSuchKeyException ignored) {
+        } catch (Exception e) {
+            LOG.warnf(e, "s3.deleteObject failed key=%s", storedPath);
+        }
+    }
+
     private void requireConfigured() {
         if (s3 == null) throw new IllegalStateException(
                 "S3 storage backend is not configured. Set STREAMVAULT_S3_ENDPOINT and related env vars.");
