@@ -90,4 +90,9 @@ public class AlbumRepositoryImpl implements AlbumRepository, PanacheRepositoryBa
     public Uni<Album> persist(Album album) {
         return persistAndFlush(album);
     }
+
+    @Override
+    public Uni<Album> update(Album album) {
+        return sf.withTransaction(session -> session.merge(album));
+    }
 }

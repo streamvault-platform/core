@@ -37,4 +37,10 @@ public interface StorageBackend {
      * Filesystem: absolute path under mediaPath
      */
     String transcodedStoredPath(UUID trackId);
+
+    /** Stores cover art and returns the backend-specific storedPath. */
+    String storeCoverArt(Path tempFile, UUID albumId, String extension);
+
+    /** Deletes the object/file at storedPath. No-op if not found. */
+    void delete(String storedPath);
 }

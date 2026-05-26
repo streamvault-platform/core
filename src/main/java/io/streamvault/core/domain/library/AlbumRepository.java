@@ -14,4 +14,5 @@ public interface AlbumRepository {
     Uni<List<Album>> search(String q, int page, int size);
     Uni<Long> countAll();
     Uni<Album> persist(Album album);
+    Uni<Album> update(Album album);
 }

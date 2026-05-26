@@ -88,6 +88,8 @@ public class UserLibraryResource {
                 LOG.error("library storage failed: {}", x.message());
                 yield Response.status(500).entity(new ErrorResponse("STORAGE_ERROR", "Storage error")).build();
             }
+            case LibraryError.AlbumNotFound x ->
+                    Response.status(404).entity(new ErrorResponse("ALBUM_NOT_FOUND", "Album not found")).build();
         };
     }
 

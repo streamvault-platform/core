@@ -80,4 +80,24 @@ public class FilesystemStorageBackend implements StorageBackend {
         return Path.of(mediaPath).resolve("transcoded").resolve(trackId + ".aac")
                 .toAbsolutePath().toString();
     }
+
+    @Override
+    public String storeCoverArt(Path tempFile, UUID albumId, String extension) {
+        Path dest = Path.of(mediaPath).resolve("covers").resolve(albumId + extension);
+        try {
+            Files.createDirectories(dest.getParent());
+            Files.move(tempFile, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return dest.toAbsolutePath().toString();
+        } catch (IOException e) {
+            throw new LibraryException(new LibraryError.StorageError(e.getMessage()));
+        }
+    }
+
+    @Override
+    public void delete(String storedPath) {
+        try {
+            Files.deleteIfExists(Path.of(storedPath));
+        } catch (IOException ignored) {
+        }
+    }
 }
