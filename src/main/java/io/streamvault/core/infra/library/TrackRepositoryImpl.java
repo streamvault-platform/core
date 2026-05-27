@@ -125,4 +125,9 @@ public class TrackRepositoryImpl implements TrackRepository, PanacheRepositoryBa
     public Uni<Track> update(Track track) {
         return persistAndFlush(track);
     }
+
+    @Override
+    public Uni<Void> delete(UUID id) {
+        return delete("id = ?1", id).replaceWithVoid();
+    }
 }
