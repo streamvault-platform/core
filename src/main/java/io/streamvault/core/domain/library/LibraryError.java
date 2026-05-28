@@ -7,4 +7,5 @@ public sealed interface LibraryError {
     record AlbumNotFound() implements LibraryError {}
     record AlreadyInLibrary() implements LibraryError {}
     record NotInLibrary() implements LibraryError {}
+    record Forbidden() implements LibraryError {}
 }

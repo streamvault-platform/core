@@ -17,4 +17,5 @@ public interface TrackRepository {
     Uni<Long> countAll();
     Uni<Track> persist(Track track);
     Uni<Track> update(Track track);
+    Uni<Void> delete(UUID id);
 }

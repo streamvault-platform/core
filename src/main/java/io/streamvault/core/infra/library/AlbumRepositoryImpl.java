@@ -95,4 +95,9 @@ public class AlbumRepositoryImpl implements AlbumRepository, PanacheRepositoryBa
     public Uni<Album> update(Album album) {
         return sf.withTransaction(session -> session.merge(album));
     }
+
+    @Override
+    public Uni<Void> delete(UUID id) {
+        return delete("id = ?1", id).replaceWithVoid();
+    }
 }

@@ -15,4 +15,5 @@ public interface AlbumRepository {
     Uni<Long> countAll();
     Uni<Album> persist(Album album);
     Uni<Album> update(Album album);
+    Uni<Void> delete(UUID id);
 }

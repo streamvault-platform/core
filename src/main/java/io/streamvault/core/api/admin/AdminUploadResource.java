@@ -89,6 +89,8 @@ public class AdminUploadResource {
                         case LibraryError.AlbumNotFound x ->
                                 Response.status(404).entity(new ErrorResponse("ALBUM_NOT_FOUND", "Album not found"))
                                                 .build();
+                        case LibraryError.Forbidden x ->
+                                Response.status(403).entity(new ErrorResponse("FORBIDDEN", "Access denied")).build();
                 };
         }
 }
