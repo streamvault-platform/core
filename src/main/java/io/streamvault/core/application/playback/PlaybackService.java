@@ -13,6 +13,7 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,11 +30,13 @@ public class PlaybackService {
     @Inject TrackPositionRepository trackPositions;
     @Inject ReactiveRedisDataSource redis;
     @Inject ObjectMapper objectMapper;
+    @Inject ScrobbleEventPublisher scrobblePublisher;
 
     public Uni<Void> handleEvent(UUID userId, PlaybackEvent event) {
         return switch (event) {
             case PlaybackEvent.Play e      -> persistToDb(userId, e.trackId(), e.positionMs(), true)
-                                                .flatMap(v -> bufferPosition(userId, e.trackId(), e.positionMs()));
+                                                .flatMap(v -> bufferPosition(userId, e.trackId(), e.positionMs()))
+                                                .flatMap(v -> publishScrobble(userId, e.trackId(), e.positionMs()));
             case PlaybackEvent.Heartbeat e -> bufferPosition(userId, e.trackId(), e.positionMs());
             case PlaybackEvent.Seek e      -> bufferPosition(userId, e.trackId(), e.positionMs());
             case PlaybackEvent.Pause e     -> flushToDb(userId, e.trackId(), e.positionMs());
@@ -42,6 +45,13 @@ public class PlaybackService {
 
     public Uni<Optional<PlaybackState>> getState(UUID userId) {
         return Panache.withTransaction(() -> playbackStates.findByUserId(userId));
+    }
+
+    private Uni<Void> publishScrobble(UUID userId, UUID trackId, long positionMs) {
+        return scrobblePublisher.publish(new ScrobbleEvent(userId, trackId, positionMs, Instant.now()))
+                .onFailure().invoke(e -> log.warnf("action=scrobble_publish_failed userId=%s trackId=%s error=%s",
+                        userId, trackId, e.getMessage()))
+                .onFailure().recoverWithNull();
     }
 
     // Buffer latest position in Redis; mark user dirty for background flush
