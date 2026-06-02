@@ -50,7 +50,7 @@ class PlaylistResourceIT {
         // Register users
         userToken = given()
                 .contentType(ContentType.JSON)
-                .body(new RegisterRequest("user1", "Password123!"))
+                .body(new RegisterRequest("user1", "Password123!", null))
                 .post("/api/auth/register")
                 .jsonPath().getString("accessToken");
 

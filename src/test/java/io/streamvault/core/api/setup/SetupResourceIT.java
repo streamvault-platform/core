@@ -33,20 +33,22 @@ class SetupResourceIT {
                 .when().get("/api/setup/status")
                 .then()
                 .statusCode(200)
-                .body("configured", is(false));
+                .body("configured", is(false))
+                .body("openRegistrationEnabled", is(false));
     }
 
     @Test
     void status_adminExists_returnsConfigured() {
         given()
                 .contentType(ContentType.JSON)
-                .body(new RegisterRequest("admin", "Admin123!"))
+                .body(new RegisterRequest("admin", "Admin123!", null))
                 .post("/api/auth/register");
 
         given()
                 .when().get("/api/setup/status")
                 .then()
                 .statusCode(200)
-                .body("configured", is(true));
+                .body("configured", is(true))
+                .body("openRegistrationEnabled", is(false));
     }
 }

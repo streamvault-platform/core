@@ -19,13 +19,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuthServiceIT {
 
     @Inject AuthService authService;
+    @Inject InviteService inviteService;
     @Inject AgroalDataSource ds;
 
     @BeforeEach
     void cleanup() throws SQLException {
         try (var conn = ds.getConnection();
              var stmt = conn.createStatement()) {
-            stmt.execute("TRUNCATE refresh_tokens, users CASCADE");
+            stmt.execute("TRUNCATE invite_links, refresh_tokens, users CASCADE");
         }
     }
 
@@ -35,7 +36,7 @@ class AuthServiceIT {
     @RunOnVertxContext
     void register_returnsTokenPair(UniAsserter asserter) {
         asserter.assertThat(
-                () -> authService.register("admin", "Admin123!"),
+                () -> authService.register("admin", "Admin123!", null),
                 result -> {
                     assertThat(result.accessToken()).isNotBlank();
                     assertThat(result.refreshToken()).isNotBlank();
@@ -44,36 +45,22 @@ class AuthServiceIT {
 
     @Test
     @RunOnVertxContext
-    void register_secondCall_failsWithAlreadyConfigured(UniAsserter asserter) {
-        // Register guard runs before username check: any second call → AlreadyConfigured
+    void register_secondCallNoInvite_failsWithRegistrationClosed(UniAsserter asserter) {
         asserter
-                .execute(() -> authService.register("admin", "Admin123!"))
+                .execute(() -> authService.register("admin", "Admin123!", null))
                 .assertFailedWith(
-                        () -> authService.register("admin", "OtherPass456!"),
+                        () -> authService.register("user2", "OtherPass456!", null),
                         e -> assertThat(e)
                                 .isInstanceOf(AuthException.class)
                                 .satisfies(ex -> assertThat(((AuthException) ex).error())
-                                        .isInstanceOf(AuthError.AlreadyConfigured.class)));
-    }
-
-    @Test
-    @RunOnVertxContext
-    void register_whenAlreadyConfigured_fails(UniAsserter asserter) {
-        asserter
-                .execute(() -> authService.register("admin", "Admin123!"))
-                .assertFailedWith(
-                        () -> authService.register("admin2", "Admin456!"),
-                        e -> assertThat(e)
-                                .isInstanceOf(AuthException.class)
-                                .satisfies(ex -> assertThat(((AuthException) ex).error())
-                                        .isInstanceOf(AuthError.AlreadyConfigured.class)));
+                                        .isInstanceOf(AuthError.RegistrationClosed.class)));
     }
 
     @Test
     @RunOnVertxContext
     void register_setsAdminRole(UniAsserter asserter) {
         asserter.assertThat(
-                () -> authService.register("admin", "Admin123!"),
+                () -> authService.register("admin", "Admin123!", null),
                 tokens -> {
                     String payload = new String(java.util.Base64.getUrlDecoder()
                             .decode(tokens.accessToken().split("\\.")[1]));
@@ -87,7 +74,7 @@ class AuthServiceIT {
     @RunOnVertxContext
     void login_withCorrectCredentials_returnsTokenPair(UniAsserter asserter) {
         asserter
-                .execute(() -> authService.register("admin", "Admin123!"))
+                .execute(() -> authService.register("admin", "Admin123!", null))
                 .assertThat(
                         () -> authService.login("admin", "Admin123!"),
                         result -> {
@@ -100,7 +87,7 @@ class AuthServiceIT {
     @RunOnVertxContext
     void login_withWrongPassword_fails(UniAsserter asserter) {
         asserter
-                .execute(() -> authService.register("admin", "Admin123!"))
+                .execute(() -> authService.register("admin", "Admin123!", null))
                 .assertFailedWith(
                         () -> authService.login("admin", "WrongPassword1!"),
                         e -> assertThat(e)
@@ -127,7 +114,7 @@ class AuthServiceIT {
     void refresh_withValidToken_returnsNewTokenPair(UniAsserter asserter) {
         asserter
                 .assertThat(
-                        () -> authService.register("admin", "Admin123!"),
+                        () -> authService.register("admin", "Admin123!", null),
                         initial -> asserter.putData("token", initial.refreshToken()))
                 .assertThat(
                         () -> authService.refresh((String) asserter.getData("token")),
@@ -142,7 +129,7 @@ class AuthServiceIT {
     void refresh_rotatesToken_oldTokenNoLongerValid(UniAsserter asserter) {
         asserter
                 .assertThat(
-                        () -> authService.register("admin", "Admin123!"),
+                        () -> authService.register("admin", "Admin123!", null),
                         initial -> asserter.putData("token", initial.refreshToken()))
                 .execute(() -> authService.refresh((String) asserter.getData("token")))
                 .assertFailedWith(
@@ -171,7 +158,7 @@ class AuthServiceIT {
     void logout_invalidatesRefreshToken(UniAsserter asserter) {
         asserter
                 .assertThat(
-                        () -> authService.register("admin", "Admin123!"),
+                        () -> authService.register("admin", "Admin123!", null),
                         tokens -> {
                             asserter.putData("refreshToken", tokens.refreshToken());
                             asserter.putData("userId", extractUserId(tokens.accessToken()));
@@ -185,7 +172,85 @@ class AuthServiceIT {
                                         .isInstanceOf(AuthError.TokenNotFound.class)));
     }
 
+    // ── invite-based registration ─────────────────────────────────────────────
+
+    @Test
+    @RunOnVertxContext
+    void register_withValidInvite_succeeds(UniAsserter asserter) {
+        asserter
+                .assertThat(
+                        () -> authService.register("admin", "Admin123!", null),
+                        tokens -> asserter.putData("adminId", extractUserId(tokens.accessToken())))
+                .assertThat(
+                        () -> inviteService.createInvite((UUID) asserter.getData("adminId"), null),
+                        invite -> asserter.putData("inviteToken", invite.token))
+                .assertThat(
+                        () -> authService.register("user2", "User456!", (String) asserter.getData("inviteToken")),
+                        tokens -> assertThat(tokens.accessToken()).isNotBlank());
+    }
+
+    @Test
+    @RunOnVertxContext
+    void register_withValidInvite_marksInviteAsUsed(UniAsserter asserter) {
+        asserter
+                .assertThat(
+                        () -> authService.register("admin", "Admin123!", null),
+                        tokens -> asserter.putData("adminId", extractUserId(tokens.accessToken())))
+                .assertThat(
+                        () -> inviteService.createInvite((UUID) asserter.getData("adminId"), null),
+                        invite -> asserter.putData("inviteToken", invite.token))
+                .execute(() -> authService.register("user2", "User456!", (String) asserter.getData("inviteToken")))
+                .assertThat(
+                        () -> inviteService.isTokenValid((String) asserter.getData("inviteToken")),
+                        valid -> assertThat(valid).isFalse());
+    }
+
+    @Test
+    @RunOnVertxContext
+    void register_withInvalidInviteToken_fails(UniAsserter asserter) {
+        asserter
+                .execute(() -> authService.register("admin", "Admin123!", null))
+                .assertFailedWith(
+                        () -> authService.register("user2", "User456!", "0".repeat(64)),
+                        e -> assertThat(e)
+                                .isInstanceOf(AuthException.class)
+                                .satisfies(ex -> assertThat(((AuthException) ex).error())
+                                        .isInstanceOf(AuthError.InvalidInvite.class)));
+    }
+
+    @Test
+    @RunOnVertxContext
+    void register_withExpiredInvite_fails(UniAsserter asserter) {
+        asserter
+                .assertThat(
+                        () -> authService.register("admin", "Admin123!", null),
+                        tokens -> asserter.putData("adminId", extractUserId(tokens.accessToken())))
+                .assertThat(
+                        () -> inviteService.createInvite((UUID) asserter.getData("adminId"), null),
+                        invite -> {
+                            asserter.putData("inviteToken", invite.token);
+                            expireTokenBlocking(invite.token);
+                        })
+                .assertFailedWith(
+                        () -> authService.register("user2", "User456!", (String) asserter.getData("inviteToken")),
+                        e -> assertThat(e)
+                                .isInstanceOf(AuthException.class)
+                                .satisfies(ex -> assertThat(((AuthException) ex).error())
+                                        .isInstanceOf(AuthError.InvalidInvite.class)));
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    private void expireTokenBlocking(String token) {
+        try (var conn = ds.getConnection();
+             var stmt = conn.prepareStatement(
+                     "UPDATE invite_links SET expires_at = now() - interval '1 hour' WHERE token = ?")) {
+            stmt.setString(1, token);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     private UUID extractUserId(String accessToken) {
         String[] parts = accessToken.split("\\.");

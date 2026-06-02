@@ -44,8 +44,8 @@ cd ../infra && docker compose up -d
 ## Tests
 
 ```sh
-./mvnw test          # unit tests
-./mvnw verify        # unit + integration tests (requires Docker for Testcontainers)
+./mvnw test                       # unit tests only
+./mvnw verify -DskipITs=false     # unit + integration tests (requires Docker for Testcontainers)
 ```
 
 Integration tests use real Postgres, Kafka, and S3 via Testcontainers — nothing is mocked.

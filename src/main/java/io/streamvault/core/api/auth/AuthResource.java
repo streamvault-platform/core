@@ -8,6 +8,7 @@ import io.streamvault.core.api.auth.dto.RegisterRequest;
 import io.streamvault.core.api.common.ErrorResponse;
 import io.streamvault.core.application.auth.AuthException;
 import io.streamvault.core.application.auth.AuthService;
+import io.streamvault.core.application.auth.InviteService;
 import io.streamvault.core.domain.auth.AuthError;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -29,17 +30,34 @@ import java.util.UUID;
 public class AuthResource {
 
     @Inject AuthService authService;
+    @Inject InviteService inviteService;
     @Inject JsonWebToken jwt;
 
     @POST
     @Path("/register")
-    @Operation(summary = "Register", description = "Create the initial admin account on a fresh install. Returns 409 if the server is already configured or the username is taken.")
-    @APIResponse(responseCode = "201", description = "Admin account created, tokens returned")
-    @APIResponse(responseCode = "409", description = "Server already configured, or username already taken")
+    @Operation(summary = "Register", description = "Create an account. First call creates the admin. Subsequent calls require an invite token when open registration is disabled.")
+    @APIResponse(responseCode = "201", description = "Account created, tokens returned")
+    @APIResponse(responseCode = "403", description = "Registration is closed — invite token required")
+    @APIResponse(responseCode = "409", description = "Username already taken")
+    @APIResponse(responseCode = "410", description = "Invite token is invalid or already used")
     public Uni<Response> register(@Valid RegisterRequest req) {
-        return authService.register(req.username(), req.password())
+        return authService.register(req.username(), req.password(), req.inviteToken())
                 .map(token -> Response.status(201).entity(token).build());
     }
+
+    @GET
+    @Path("/invite")
+    @Operation(summary = "Check invite token", description = "Returns whether an invite token is valid and unused. Safe to call before showing the registration form.")
+    @APIResponse(responseCode = "200", description = "Token validity returned")
+    public Uni<Response> checkInvite(@QueryParam("invite") String token) {
+        if (token == null || token.isBlank()) {
+            return Uni.createFrom().item(Response.ok(new InviteCheckResponse(false)).build());
+        }
+        return inviteService.isTokenValid(token)
+                .map(valid -> Response.ok(new InviteCheckResponse(valid)).build());
+    }
+
+    public record InviteCheckResponse(boolean valid) {}
 
     @POST
     @Path("/login")
@@ -87,6 +105,10 @@ public class AuthResource {
                     Response.status(401).entity(new ErrorResponse("TOKEN_EXPIRED", "Refresh token has expired")).build();
             case AuthError.TokenNotFound x ->
                     Response.status(401).entity(new ErrorResponse("TOKEN_NOT_FOUND", "Invalid refresh token")).build();
+            case AuthError.RegistrationClosed x ->
+                    Response.status(403).entity(new ErrorResponse("REGISTRATION_CLOSED", "Registration requires an invite link")).build();
+            case AuthError.InvalidInvite x ->
+                    Response.status(410).entity(new ErrorResponse("INVALID_INVITE", "Invite token is invalid, expired, or already used")).build();
         };
     }
 }
