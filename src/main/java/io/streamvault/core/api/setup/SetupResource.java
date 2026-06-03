@@ -9,6 +9,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -21,15 +22,17 @@ public class SetupResource {
     @Inject
     AuthService authService;
 
+    @ConfigProperty(name = "streamvault.open-registration", defaultValue = "false")
+    boolean openRegistration;
+
     @GET
     @Path("/status")
     @Operation(
             summary = "Setup status",
-            description = "Returns whether the initial admin account has been created. "
-                    + "Use this to decide whether to show the setup screen or the login screen.")
+            description = "Returns whether the initial admin account has been created and whether open registration is enabled.")
     @APIResponse(responseCode = "200", description = "Setup status returned")
     public Uni<Response> status() {
         return authService.isConfigured()
-                .map(configured -> Response.ok(new SetupStatusResponse(configured)).build());
+                .map(configured -> Response.ok(new SetupStatusResponse(configured, openRegistration)).build());
     }
 }

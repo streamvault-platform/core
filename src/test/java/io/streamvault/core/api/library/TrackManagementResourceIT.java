@@ -41,7 +41,7 @@ class TrackManagementResourceIT {
         }
         adminToken = given()
                 .contentType(ContentType.JSON)
-                .body(new RegisterRequest("admin", "Admin123!"))
+                .body(new RegisterRequest("admin", "Admin123!", null))
                 .post("/api/auth/register")
                 .jsonPath().getString("accessToken");
 

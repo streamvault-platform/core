@@ -7,6 +7,7 @@ import io.smallrye.mutiny.Uni;
 import io.streamvault.core.domain.auth.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,32 +25,56 @@ public class AuthService {
     RefreshTokenRepository refreshTokens;
     @Inject
     TokenService tokenService;
+    @Inject
+    InviteService inviteService;
+
+    @ConfigProperty(name = "streamvault.open-registration", defaultValue = "false")
+    boolean openRegistration;
 
     @WithSession
     public Uni<Boolean> isConfigured() {
         return users.hasAdminAccount();
     }
 
-    public Uni<TokenResponse> register(String username, String password) {
+    public Uni<TokenResponse> register(String username, String password, String inviteToken) {
         return Panache.withTransaction(() -> users.hasAdminAccount().flatMap(configured -> {
-            if (configured) {
-                return Uni.createFrom().failure(
-                        new AuthException(new AuthError.AlreadyConfigured()));
+            if (!configured) {
+                // First user — always ADMIN, no invite needed
+                return createUserEntity(username, password, Role.ADMIN).flatMap(this::issueTokenPair);
             }
-            return users.findByUsername(username).flatMap(existing -> {
-                if (existing.isPresent()) {
-                    return Uni.createFrom().failure(
-                            new AuthException(new AuthError.UsernameAlreadyTaken()));
+            if (openRegistration) {
+                return createUserEntity(username, password, Role.USER).flatMap(this::issueTokenPair);
+            }
+            // Closed registration — require a valid invite
+            if (inviteToken == null || inviteToken.isBlank()) {
+                return Uni.createFrom().<TokenResponse>failure(new AuthException(new AuthError.RegistrationClosed()));
+            }
+            return inviteService.findByToken(inviteToken).flatMap(opt -> {
+                if (opt.isEmpty() || !opt.get().isValid()) {
+                    return Uni.createFrom().<TokenResponse>failure(new AuthException(new AuthError.InvalidInvite()));
                 }
-                var user = new User();
-                user.username = username;
-                user.passwordHash = BcryptUtil.bcryptHash(password);
-                user.role = Role.ADMIN;
-                return users.persist(user)
-                        .invoke(u -> LOG.info("action=register userId={} username={}", u.id, u.username))
-                        .flatMap(this::issueTokenPair);
+                var invite = opt.get();
+                return createUserEntity(username, password, Role.USER).flatMap(u -> {
+                    invite.usedAt = OffsetDateTime.now();
+                    invite.usedById = u.id;
+                    return inviteService.update(invite).flatMap(ignored -> issueTokenPair(u));
+                });
             });
         }));
+    }
+
+    private Uni<User> createUserEntity(String username, String password, Role role) {
+        return users.findByUsername(username).flatMap(existing -> {
+            if (existing.isPresent()) {
+                return Uni.createFrom().<User>failure(new AuthException(new AuthError.UsernameAlreadyTaken()));
+            }
+            var user = new User();
+            user.username = username;
+            user.passwordHash = BcryptUtil.bcryptHash(password);
+            user.role = role;
+            return users.persist(user)
+                    .invoke(u -> LOG.info("action=register userId={} username={} role={}", u.id, u.username, u.role));
+        });
     }
 
     public Uni<TokenResponse> login(String username, String password) {

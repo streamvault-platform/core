@@ -34,7 +34,7 @@ class AuthResourceIT {
     void register_returnsCreated_withTokenPair() {
         given()
                 .contentType(ContentType.JSON)
-                .body(new RegisterRequest("admin", "Admin123!"))
+                .body(new RegisterRequest("admin", "Admin123!", null))
                 .when().post("/api/auth/register")
                 .then()
                 .statusCode(201)
@@ -43,16 +43,16 @@ class AuthResourceIT {
     }
 
     @Test
-    void register_whenAlreadyConfigured_returnsServerConfigured() {
+    void register_noInvite_afterAdminExists_returnsRegistrationClosed() {
         registerAdmin();
 
         given()
                 .contentType(ContentType.JSON)
-                .body(new RegisterRequest("otheruser", "Other456!"))
+                .body(new RegisterRequest("otheruser", "Other456!", null))
                 .when().post("/api/auth/register")
                 .then()
-                .statusCode(409)
-                .body("code", equalTo("SERVER_CONFIGURED"));
+                .statusCode(403)
+                .body("code", equalTo("REGISTRATION_CLOSED"));
     }
 
     @Test
@@ -68,7 +68,7 @@ class AuthResourceIT {
     void register_blankUsername_returnsBadRequest() {
         given()
                 .contentType(ContentType.JSON)
-                .body(new RegisterRequest("", "Admin123!"))
+                .body(new RegisterRequest("", "Admin123!", null))
                 .when().post("/api/auth/register")
                 .then()
                 .statusCode(400);
@@ -78,7 +78,7 @@ class AuthResourceIT {
     void register_weakPassword_returnsBadRequest() {
         given()
                 .contentType(ContentType.JSON)
-                .body(new RegisterRequest("admin", "alllowercase"))
+                .body(new RegisterRequest("admin", "alllowercase", null))
                 .when().post("/api/auth/register")
                 .then()
                 .statusCode(400);
@@ -162,7 +162,7 @@ class AuthResourceIT {
     private String registerAdmin() {
         return given()
                 .contentType(ContentType.JSON)
-                .body(new RegisterRequest("admin", "Admin123!"))
+                .body(new RegisterRequest("admin", "Admin123!", null))
                 .post("/api/auth/register")
                 .jsonPath()
                 .getString("accessToken");
