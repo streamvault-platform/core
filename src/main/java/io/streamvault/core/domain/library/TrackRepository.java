@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public interface TrackRepository {
     Uni<Optional<Track>> findTrackById(UUID id);
+    Uni<List<Track>> findTracksByIds(List<UUID> ids);
     Uni<Optional<Track>> findTrackByIdWithDetails(UUID id);
     Uni<Optional<Track>> findByFilePath(String filePath);
     Uni<List<Track>> listAll(int page, int size);

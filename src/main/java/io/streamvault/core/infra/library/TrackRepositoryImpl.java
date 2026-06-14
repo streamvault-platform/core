@@ -38,6 +38,12 @@ public class TrackRepositoryImpl implements TrackRepository, PanacheRepositoryBa
             """;
 
     @Override
+    public Uni<List<Track>> findTracksByIds(List<UUID> ids) {
+        if (ids.isEmpty()) return Uni.createFrom().item(List.of());
+        return find("id IN ?1", ids).list();
+    }
+
+    @Override
     public Uni<Optional<Track>> findTrackById(UUID id) {
         return find("id", id).firstResult().map(Optional::ofNullable);
     }
