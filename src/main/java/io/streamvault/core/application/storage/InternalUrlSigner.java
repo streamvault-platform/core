@@ -7,6 +7,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
@@ -30,7 +31,9 @@ public class InternalUrlSigner {
 
     public boolean verify(String storedPath, long expiresAt, String sig) {
         if (Instant.now().getEpochSecond() > expiresAt) return false;
-        return hmac(storedPath + "|" + expiresAt).equals(sig);
+        byte[] expected = hmac(storedPath + "|" + expiresAt).getBytes(StandardCharsets.UTF_8);
+        byte[] actual = sig.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(expected, actual);
     }
 
     private String signedUrl(String operation, String storedPath, Duration expiry) {
